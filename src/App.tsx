@@ -5,7 +5,8 @@ import { LongitudinalScene } from './LongitudinalScene';
 import { StabilityChart } from './StabilityChart';
 import { Slider } from './Slider';
 import { LoadPlan } from './LoadPlan';
-import { calculateLoadSummary, defaultLoadWeights, LoadWeights } from './loadData';
+import { calculateLoadSummary, defaultLoadWeights, InverseSolution, InverseTarget, LoadWeights, solveInverseLoad } from './loadData';
+import { InversePlanner } from './InversePlanner';
 
 const initialState: Inputs = { draft: 5.8, kg: 5.39, freeSurfaceMoment: 0, shiftedWeight: 0, shiftDistance: 0, loadTransverseMoment: 0 };
 
@@ -33,6 +34,8 @@ function App() {
   const [mode, setMode] = useState<'explore' | 'load'>('explore');
   const [loadWeights, setLoadWeights] = useState<LoadWeights>(defaultLoadWeights);
   const loadSummary = useMemo(() => calculateLoadSummary(loadWeights), [loadWeights]);
+  const [inverseTarget, setInverseTarget] = useState<InverseTarget>({ displacement: 8200, kg: 5.397, lcg: -.03, tcg: 0 });
+  const [inverseSolution, setInverseSolution] = useState<InverseSolution>();
   const effectiveInputs = useMemo<Inputs>(() => mode === 'explore' ? inputs : ({
     draft: draftFromDisplacement(loadSummary.displacement), kg: loadSummary.kg,
     freeSurfaceMoment: loadSummary.freeSurfaceMoment, shiftedWeight: 0, shiftDistance: 0,
@@ -40,7 +43,9 @@ function App() {
   }), [mode, inputs, loadSummary]);
   const stability = useMemo(() => calculateStability(effectiveInputs), [effectiveInputs]);
   const set = (field: keyof Inputs) => (value: number) => setInputs((current) => ({ ...current, [field]: value }));
-  const updateLoad = (id: string, value: number) => setLoadWeights((current) => ({ ...current, [id]: Number.isFinite(value) ? value : 0 }));
+  const updateLoad = (id: string, value: number) => { setLoadWeights((current) => ({ ...current, [id]: Number.isFinite(value) ? value : 0 })); setInverseSolution(undefined); };
+  const updateInverseTarget = (target: InverseTarget) => { setInverseTarget({ displacement: Math.round(target.displacement*10)/10, kg: Math.round(target.kg*1000)/1000, lcg: Math.round(target.lcg*1000)/1000, tcg: Math.round(target.tcg*1000)/1000 }); setInverseSolution(undefined); };
+  const resetInverseTarget = () => updateInverseTarget({ displacement: loadSummary.displacement, kg: loadSummary.kg, lcg: loadSummary.lcg, tcg: loadSummary.tcg });
 
   return (
     <div className="page-shell">
@@ -56,7 +61,7 @@ function App() {
 
       <div className="mode-switcher" role="group" aria-label="Modo del simulador">
         <button className={mode === 'explore' ? 'active' : ''} onClick={() => setMode('explore')}><b>Explorador rápido</b><span>Controla las variables directamente</span></button>
-        <button className={mode === 'load' ? 'active' : ''} onClick={() => setMode('load')}><b>Cuadro de carga</b><span>Calcula Δ y G desde pesos reales</span><em>Nuevo</em></button>
+        <button className={mode === 'load' ? 'active' : ''} onClick={() => { setMode('load'); resetInverseTarget(); }}><b>Cuadro de carga</b><span>Calcula Δ y G desde pesos reales</span><em>Nuevo</em></button>
       </div>
 
       <nav className="lesson-strip" aria-label="Recorrido de aprendizaje">
@@ -75,7 +80,7 @@ function App() {
             <button className={view === 'transverse' ? 'active' : ''} onClick={() => setView('transverse')}><span>↔</span><div><b>Vista transversal</b><small>Escora, G, B, M y GM</small></div></button>
             <button className={view === 'longitudinal' ? 'active' : ''} onClick={() => setView('longitudinal')}><span>⇄</span><div><b>Vista longitudinal</b><small>Flotación, asiento, Xb y Xf</small></div></button>
           </div>
-          {view === 'transverse' ? <ShipScene data={stability} inputs={effectiveInputs} /> : <LongitudinalScene data={stability} inputs={effectiveInputs} lcg={mode === 'load' ? loadSummary.lcg : undefined} />}
+          {view === 'transverse' ? <ShipScene data={stability} inputs={effectiveInputs} targetG={mode === 'load' ? { kg: inverseTarget.kg, tcg: inverseTarget.tcg } : undefined} onTargetGChange={mode === 'load' ? (target) => updateInverseTarget({ ...inverseTarget, ...target }) : undefined} /> : <LongitudinalScene data={stability} inputs={effectiveInputs} lcg={mode === 'load' ? loadSummary.lcg : undefined} targetLcg={mode === 'load' ? inverseTarget.lcg : undefined} onTargetLcgChange={mode === 'load' ? (lcg) => updateInverseTarget({ ...inverseTarget, lcg }) : undefined} />}
           <div className="metric-grid">
             <article><span>Desplazamiento Δ</span><strong>{number(stability.hydro.displacement, 0)} t</strong><small>Interpolado de la tabla</small></article>
             <article><span>KB</span><strong>{number(stability.hydro.kb)} m</strong><small>Quilla → centro de carena</small></article>
@@ -122,7 +127,8 @@ function App() {
           </>}
         </aside>
 
-        {mode === 'load' && <LoadPlan weights={loadWeights} summary={loadSummary} onChange={updateLoad} onReset={() => setLoadWeights(defaultLoadWeights)} />}
+        {mode === 'load' && <LoadPlan weights={loadWeights} summary={loadSummary} onChange={updateLoad} onReset={() => { setLoadWeights(defaultLoadWeights); setInverseSolution(undefined); }} />}
+        {mode === 'load' && <InversePlanner current={loadSummary} target={inverseTarget} solution={inverseSolution} onTargetChange={updateInverseTarget} onResetTarget={resetInverseTarget} onSolve={() => setInverseSolution(solveInverseLoad(loadWeights,inverseTarget))} onApply={() => { if (inverseSolution) { setLoadWeights(inverseSolution.weights); setInverseSolution(undefined); } }} />}
 
         <section className="chart-panel">
           <div className="chart-heading"><div><p className="eyebrow">Pantocarenas del Buque Echo</p><h2>Curva de brazos adrizantes</h2></div><div className="formula-pill">GZ = KN − KG<sub>corr</sub> · sen θ − GG′ · cos θ</div></div>

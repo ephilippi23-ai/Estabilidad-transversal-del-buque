@@ -1,12 +1,19 @@
+import { PointerEvent, useState } from 'react';
 import { Inputs, StabilityResult } from './stability';
 
-type Props = { data: StabilityResult; inputs: Inputs; lcg?: number };
+type Props = { data: StabilityResult; inputs: Inputs; lcg?: number; targetLcg?: number; onTargetLcgChange?: (lcg: number) => void };
 
-export function LongitudinalScene({ data, inputs, lcg }: Props) {
+export function LongitudinalScene({ data, inputs, lcg, targetLcg, onTargetLcgChange }: Props) {
+  const [dragging, setDragging] = useState(false);
   const midshipX = 310;
   const metersToPixels = 18;
   const longitudinalX = (meters: number) => midshipX + meters * metersToPixels;
   const waterY = 235 - (inputs.draft - 2.3) * 12;
+  const moveTarget = (event: PointerEvent<SVGSVGElement>) => {
+    if (!onTargetLcgChange || (!dragging && event.type === 'pointermove')) return;
+    const rect = event.currentTarget.getBoundingClientRect(); const x = (event.clientX-rect.left)*620/rect.width;
+    onTargetLcgChange(Math.max(-40,Math.min(40,(x-midshipX)/metersToPixels)));
+  };
 
   return (
     <div className="ship-card longitudinal-card">
@@ -15,7 +22,7 @@ export function LongitudinalScene({ data, inputs, lcg }: Props) {
         <div className="heel-readout"><b>{inputs.draft.toFixed(1)} m</b><span>calado medio</span></div>
       </div>
       <div className="ship-canvas longitudinal-canvas">
-        <svg viewBox="0 0 620 390" role="img" aria-label="Vista longitudinal didáctica del Buque Echo">
+        <svg viewBox="0 0 620 390" role="img" aria-label="Vista longitudinal didáctica del Buque Echo" className={onTargetLcgChange?'target-enabled':''} onPointerDown={(event) => { if (onTargetLcgChange) { setDragging(true); event.currentTarget.setPointerCapture(event.pointerId); moveTarget(event); } }} onPointerMove={moveTarget} onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)}>
           <defs>
             <linearGradient id="sideHull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#edf3f3"/><stop offset="1" stopColor="#81939a"/></linearGradient>
             <linearGradient id="sideSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#187b98" stopOpacity=".75"/><stop offset="1" stopColor="#07334a"/></linearGradient>
@@ -43,12 +50,13 @@ export function LongitudinalScene({ data, inputs, lcg }: Props) {
             <line x1={longitudinalX(lcg)} y1="165" x2={longitudinalX(lcg)} y2="248"/>
             <circle cx={longitudinalX(lcg)} cy="198" r="11"/><text x={longitudinalX(lcg)+14} y="190">G · Xg {lcg.toFixed(2)} m</text>
           </g>}
+          {targetLcg !== undefined && <g className="target-lcg" transform={`translate(${longitudinalX(targetLcg)} 248)`}><circle r="16"/><circle r="5"/><text x="20" y="-7">G objetivo</text><text x="20" y="10">LCG {targetLcg.toFixed(2)} m</text></g>}
 
           <line x1="76" y1="344" x2="548" y2="344" stroke="#6f959b"/>
           <line x1="76" y1="337" x2="76" y2="351" stroke="#6f959b"/><line x1="548" y1="337" x2="548" y2="351" stroke="#6f959b"/>
           <text x="312" y="365" textAnchor="middle" className="svg-label">Eslora entre PP · 110 m</text>
           <text x="30" y={waterY-12} className="svg-muted">Línea de flotación</text>
-          <text x="590" y="382" textAnchor="end" className="svg-muted">Separación Xb–Xf ampliada para facilitar la lectura</text>
+          <text x="590" y="382" textAnchor="end" className="svg-muted">{targetLcg !== undefined ? 'Arrastra sobre el perfil para mover el LCG objetivo' : 'Separación Xb–Xf ampliada para facilitar la lectura'}</text>
         </svg>
       </div>
       <div className="longitudinal-explainer">

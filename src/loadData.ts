@@ -78,3 +78,59 @@ export function calculateLoadSummary(weights: LoadWeights): LoadSummary {
   return { displacement, kg, lcg: longitudinalMoment / displacement, tcg: transverseMoment / displacement,
     freeSurfaceMoment, freeSurfaceCorrection, correctedKg: kg + freeSurfaceCorrection, verticalMoment };
 }
+
+export type InverseTarget = { displacement: number; kg: number; lcg: number; tcg: number };
+export type LoadMovement = { item: LoadItem; from: number; to: number; delta: number };
+export type InverseSolution = {
+  weights: LoadWeights; summary: LoadSummary; movements: LoadMovement[];
+  quality: 'exact' | 'close' | 'unreachable'; score: number;
+};
+
+function targetScore(summary: LoadSummary, target: InverseTarget): number {
+  const displacementError = (summary.displacement - target.displacement) / 2;
+  const kgError = (summary.kg - target.kg) / .04;
+  const lcgError = (summary.lcg - target.lcg) / .25;
+  const tcgError = (summary.tcg - target.tcg) / .035;
+  return displacementError*displacementError + kgError*kgError + lcgError*lcgError + tcgError*tcgError;
+}
+
+// Búsqueda didáctica por transferencias de igual peso: quita de un espacio y
+// agrega a otro. Así mantiene Δ mientras aproxima las tres coordenadas de G.
+export function solveInverseLoad(currentWeights: LoadWeights, target: InverseTarget): InverseSolution {
+  const solution = { ...currentWeights };
+  const editable = loadItems.filter((item) => !item.locked && item.id !== 'crew' && item.id !== 'stores');
+  let summary = calculateLoadSummary(solution);
+  let score = targetScore(summary, target);
+
+  for (const step of [100, 50, 20, 10, 5, 2, 1]) {
+    for (let iteration = 0; iteration < 45; iteration += 1) {
+      let best: { donor: LoadItem; receiver: LoadItem; amount: number; summary: LoadSummary; score: number } | undefined;
+      for (const donor of editable) {
+        const available = solution[donor.id] ?? 0;
+        if (available < 1) continue;
+        for (const receiver of editable) {
+          if (receiver.id === donor.id) continue;
+          const capacity = receiver.maxWeight - (solution[receiver.id] ?? 0);
+          const amount = Math.min(step, available, capacity);
+          if (amount < Math.min(1, step*.2)) continue;
+          solution[donor.id] -= amount; solution[receiver.id] = (solution[receiver.id] ?? 0) + amount;
+          const candidateSummary = calculateLoadSummary(solution);
+          const candidateScore = targetScore(candidateSummary, target);
+          solution[donor.id] += amount; solution[receiver.id] -= amount;
+          if (candidateScore + 1e-6 < (best?.score ?? score)) best = { donor, receiver, amount, summary: candidateSummary, score: candidateScore };
+        }
+      }
+      if (!best) break;
+      solution[best.donor.id] -= best.amount;
+      solution[best.receiver.id] = (solution[best.receiver.id] ?? 0) + best.amount;
+      summary = best.summary; score = best.score;
+      if (score < .04) break;
+    }
+  }
+
+  const movements = editable.map((item) => ({ item, from: currentWeights[item.id] ?? 0, to: solution[item.id] ?? 0,
+    delta: (solution[item.id] ?? 0) - (currentWeights[item.id] ?? 0) })).filter((movement) => Math.abs(movement.delta) >= .5).sort((a,b) => Math.abs(b.delta)-Math.abs(a.delta));
+  const kgError = Math.abs(summary.kg-target.kg); const lcgError = Math.abs(summary.lcg-target.lcg); const tcgError = Math.abs(summary.tcg-target.tcg);
+  const quality = kgError <= .03 && lcgError <= .15 && tcgError <= .025 ? 'exact' : kgError <= .1 && lcgError <= .6 && tcgError <= .08 ? 'close' : 'unreachable';
+  return { weights: solution, summary, movements, quality, score };
+}

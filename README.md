@@ -19,6 +19,8 @@ El modo **Cuadro de carga** permite ajustar pesos y porcentajes de llenado por c
 
 En los tanques de doble fondo, la altura del centro de gravedad del líquido se considera proporcional al porcentaje de llenado. Para los piques de proa y popa se adopta `KG ≈ 0,65 × altura del nivel`. Estas reglas didácticas se muestran junto a los valores calculados.
 
+El **modo inverso** permite arrastrar un G objetivo sobre las vistas transversal y longitudinal. Manteniendo el desplazamiento, propone cambios compensados de carga y lastre que aproximan KG, LCG y TCG, siempre dentro de las capacidades disponibles. La propuesta es una solución didáctica posible, no una condición única.
+
 ## Ejecutar el proyecto
 
 Requiere una versión reciente de Node.js:

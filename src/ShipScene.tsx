@@ -1,21 +1,29 @@
+import { PointerEvent, useState } from 'react';
 import { Inputs, StabilityResult } from './stability';
 
-type Props = { data: StabilityResult; inputs: Inputs };
+type Props = { data: StabilityResult; inputs: Inputs; targetG?: { kg: number; tcg: number }; onTargetGChange?: (target: { kg: number; tcg: number }) => void };
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-export function ShipScene({ data, inputs }: Props) {
+export function ShipScene({ data, inputs, targetG, onTargetGChange }: Props) {
+  const [dragging, setDragging] = useState(false);
   const centerX = 300; const keelY = 275; const pxPerMeter = 22;
   const pointY = (height: number) => clamp(keelY - height * pxPerMeter, 34, keelY);
   const waterY = pointY(inputs.draft);
   const heel = clamp(data.heelAngle, -28, 28);
   const cargoX = centerX + (inputs.shiftDistance / 8) * 118;
   const tankLevel = clamp(inputs.freeSurfaceMoment / 4000, 0, 1);
+  const moveTarget = (event: PointerEvent<SVGSVGElement>) => {
+    if (!onTargetGChange || (!dragging && event.type === 'pointermove')) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX-rect.left) * 600/rect.width; const y = (event.clientY-rect.top) * 390/rect.height;
+    onTargetGChange({ kg: clamp((keelY-y)/pxPerMeter,.5,11), tcg: clamp((x-centerX)/150,-1.8,1.8) });
+  };
 
   return (
     <div className="ship-card">
       <div className="ship-card-heading"><div><p className="eyebrow">Sección transversal</p><h2>¿Dónde están G, B y M?</h2></div><div className="heel-readout"><b>{data.heelAngle.toFixed(1)}°</b><span>escora</span></div></div>
       <div className="ship-canvas">
-        <svg viewBox="0 0 600 390" role="img" aria-label="Sección transversal didáctica del Buque Echo">
+        <svg viewBox="0 0 600 390" role="img" aria-label="Sección transversal didáctica del Buque Echo" className={onTargetGChange?'target-enabled':''} onPointerDown={(event) => { if (onTargetGChange) { setDragging(true); event.currentTarget.setPointerCapture(event.pointerId); moveTarget(event); } }} onPointerMove={moveTarget} onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)}>
           <defs>
             <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#187b98" stopOpacity=".7"/><stop offset="1" stopColor="#062e48" stopOpacity=".95"/></linearGradient>
             <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#e8edf0"/><stop offset="1" stopColor="#788892"/></linearGradient>
@@ -42,9 +50,10 @@ export function ShipScene({ data, inputs }: Props) {
           <g className="point point-b"><circle cx={centerX} cy={pointY(data.hydro.kb)} r="10"/><text x={centerX+16} y={pointY(data.hydro.kb)+5}>B · {data.hydro.kb.toFixed(2)} m</text></g>
           <g className="point point-g"><circle cx={centerX+data.transverseG*150} cy={pointY(data.correctedKg)} r="10"/><text x={centerX+16+data.transverseG*150} y={pointY(data.correctedKg)-12}>G · {data.correctedKg.toFixed(2)} m</text></g>
           <g className="point point-m"><circle cx={centerX} cy={pointY(data.hydro.km)} r="10"/><text x={centerX+16} y={pointY(data.hydro.km)+5}>M · {data.hydro.km.toFixed(2)} m</text></g>
+          {targetG && <g className="target-g" transform={`translate(${centerX+targetG.tcg*150} ${pointY(targetG.kg)})`}><circle r="16"/><circle r="5"/><text x="22" y="-10">G objetivo</text><text x="22" y="8">KG {targetG.kg.toFixed(2)} · TCG {targetG.tcg.toFixed(2)}</text></g>}
           <line x1="500" y1={pointY(data.correctedKg)} x2="500" y2={pointY(data.hydro.km)} stroke={data.gm >= 0 ? '#6ee7a0' : '#ff6b6b'} strokeWidth="5"/>
           <text x="515" y={(pointY(data.correctedKg)+pointY(data.hydro.km))/2+4} className="svg-label">GM</text>
-          <text x="22" y="365" className="svg-muted">Las alturas se representan desde la quilla; la rotación se amplifica solo hasta 28° para facilitar la lectura.</text>
+          <text x="22" y="365" className="svg-muted">{targetG ? 'Arrastra sobre el diagrama para ubicar el G objetivo.' : 'Las alturas se representan desde la quilla; la rotación se amplifica solo hasta 28° para facilitar la lectura.'}</text>
         </svg>
       </div>
     </div>
