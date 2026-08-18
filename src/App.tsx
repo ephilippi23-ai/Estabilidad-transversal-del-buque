@@ -1,149 +1,122 @@
 import { useMemo, useState } from 'react';
-import { Activity, Anchor, Box, Gauge, Info, MoveHorizontal, RotateCcw, Waves } from 'lucide-react';
-import { calculateStability, type Inputs } from './stability';
+import { calculateStability, Inputs } from './stability';
 import { ShipScene } from './ShipScene';
+import { LongitudinalScene } from './LongitudinalScene';
 import { StabilityChart } from './StabilityChart';
 import { Slider } from './Slider';
 
-const initialInputs: Inputs = {
-  displacement: 11800,
-  length: 142,
-  beam: 21.5,
-  draft: 7.1,
-  depth: 11.8,
-  kg: 8.6,
-  kgOffset: 0,
-  kb: 3.65,
-  cargoWeight: 420,
-  cargoOffset: 4,
-  cargoHeight: 9.5,
-  ballastLevel: 52,
-  ballastOffset: -1.2,
-};
+const initialState: Inputs = { draft: 5.8, kg: 5.39, freeSurfaceMoment: 0, shiftedWeight: 0, shiftDistance: 0 };
 
-const presets: Array<{ label: string; className: string; values: Partial<Inputs> }> = [
-  { label: 'Equilibrado', className: 'good', values: initialInputs },
-  { label: 'Carga alta', className: 'reduced', values: { kg: 9.3, cargoWeight: 780, cargoHeight: 10.8, cargoOffset: 5.8, ballastLevel: 18, ballastOffset: 0 } },
-  { label: 'Lastre bajo', className: 'stiff', values: { kg: 6.2, cargoWeight: 180, cargoHeight: 5.2, cargoOffset: 0, ballastLevel: 100, ballastOffset: 0 } },
+const lessons = [
+  { title: '1. Flotación', tag: 'Δ y calado', text: 'Al aumentar el calado crece el volumen de carena y, por Arquímedes, el desplazamiento. La tabla hidrostática vincula ambos valores.' },
+  { title: '2. Equilibrio inicial', tag: 'KB, KM y GM', text: 'KB ubica el centro de carena. KM ubica el metacentro. GM = KM − KG corregido indica la tendencia inicial a volver a adrizarse.' },
+  { title: '3. Superficies libres', tag: 'Corrección de KG', text: 'El líquido en un tanque parcialmente lleno se desplaza y reduce la estabilidad. Se representa elevando virtualmente G: FSC = momento de superficie libre / Δ.' },
+  { title: '4. Traslado de pesos', tag: 'Momento escorante', text: 'Mover un peso transversalmente desplaza G. El momento es w·d y el corrimiento GG′ = w·d / Δ.' },
+  { title: '5. Grandes ángulos', tag: 'KN y GZ', text: 'Las pantocarenas proporcionan KN para cada desplazamiento y ángulo. El brazo adrizante se obtiene con GZ = KN − KG·sen θ.' },
 ];
 
-const format = (value: number, digits = 2) => value.toLocaleString('es-ES', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+const presets: Array<{ label: string; values: Inputs }> = [
+  { label: 'Condición normal', values: initialState },
+  { label: 'Tanque parcialmente lleno', values: { ...initialState, freeSurfaceMoment: 4000 } },
+  { label: 'Peso a estribor', values: { ...initialState, shiftedWeight: 400, shiftDistance: 8 } },
+  { label: 'KG elevado', values: { ...initialState, kg: 7.3 } },
+];
 
-function Metric({ label, value, unit, detail, tone }: { label: string; value: string; unit: string; detail: string; tone?: string }) {
-  return (
-    <article className={`metric ${tone ?? ''}`}>
-      <span>{label}</span>
-      <strong>{value}<small>{unit}</small></strong>
-      <p>{detail}</p>
-    </article>
-  );
-}
+const number = (value: number, digits = 2) => value.toLocaleString('es-UY', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 function App() {
-  const [inputs, setInputs] = useState(initialInputs);
-  const [controlGroup, setControlGroup] = useState<'ship' | 'loads'>('ship');
+  const [inputs, setInputs] = useState(initialState);
+  const [lesson, setLesson] = useState(0);
+  const [view, setView] = useState<'transverse' | 'longitudinal'>('transverse');
   const stability = useMemo(() => calculateStability(inputs), [inputs]);
-  const update = (key: keyof Inputs) => (value: number) => setInputs((current) => ({ ...current, [key]: value }));
+  const set = (field: keyof Inputs) => (value: number) => setInputs((current) => ({ ...current, [field]: value }));
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand-mark"><Anchor size={21} /></div>
-        <div className="brand-copy">
-          <strong>TRIMLAB</strong>
-          <span>Estabilidad transversal</span>
+    <div className="page-shell">
+      <header className="hero-panel">
+        <div>
+          <p className="eyebrow">Laboratorio interactivo · Buque Echo</p>
+          <h1>Entender la estabilidad, paso a paso</h1>
+          <p className="hero-copy">Experimenta con datos reales del buque tipo E y observa cómo cada decisión modifica G, M, GM y la curva de brazos adrizantes.</p>
+          <div className="hero-guide"><span><b>1</b> Elige un concepto</span><span><b>2</b> Mueve un control</span><span><b>3</b> Observa y explica</span></div>
         </div>
-        <div className="topbar-spacer" />
-        <span className="live-indicator"><i /> SIMULACION ACTIVA</span>
-        <button className="icon-button" title="Restablecer escenario" aria-label="Restablecer escenario" onClick={() => setInputs(initialInputs)}><RotateCcw size={18} /></button>
+        <div className={`status-badge status-${stability.statusColor}`}><span className="status-dot" />{stability.statusLabel}</div>
       </header>
 
-      <main>
-        <section className="intro-row">
-          <div>
-            <span className="section-kicker">LABORATORIO INTERACTIVO</span>
-            <h1>Comprende por que un buque vuelve a adrizarse.</h1>
+      <nav className="lesson-strip" aria-label="Recorrido de aprendizaje">
+        {lessons.map((item, index) => <button key={item.title} className={lesson === index ? 'active' : ''} onClick={() => setLesson(index)}><span>{item.title}</span><small>{item.tag}</small></button>)}
+      </nav>
+
+      <section className="lesson-callout">
+        <div className="lesson-number">0{lesson + 1}</div>
+        <div><p className="eyebrow">Concepto activo</p><h2>{lessons[lesson].title}</h2><p>{lessons[lesson].text}</p></div>
+        <button className="next-lesson" onClick={() => setLesson((lesson + 1) % lessons.length)}>{lesson === lessons.length - 1 ? 'Volver al inicio' : 'Siguiente concepto'} <span>→</span></button>
+      </section>
+
+      <main className="layout-grid">
+        <section className="visual-panel">
+          <div className="view-switcher" role="group" aria-label="Seleccionar vista del buque">
+            <button className={view === 'transverse' ? 'active' : ''} onClick={() => setView('transverse')}><span>↔</span><div><b>Vista transversal</b><small>Escora, G, B, M y GM</small></div></button>
+            <button className={view === 'longitudinal' ? 'active' : ''} onClick={() => setView('longitudinal')}><span>⇄</span><div><b>Vista longitudinal</b><small>Flotación, asiento, Xb y Xf</small></div></button>
           </div>
-          <div className={`condition condition-${stability.status}`}>
-              <Activity size={19} />
-            <div><span>CONDICION ACTUAL</span><strong>{stability.statusLabel}</strong></div>
+          {view === 'transverse' ? <ShipScene data={stability} inputs={inputs} /> : <LongitudinalScene data={stability} inputs={inputs} />}
+          <div className="metric-grid">
+            <article><span>Desplazamiento Δ</span><strong>{number(stability.hydro.displacement, 0)} t</strong><small>Interpolado de la tabla</small></article>
+            <article><span>KB</span><strong>{number(stability.hydro.kb)} m</strong><small>Quilla → centro de carena</small></article>
+            <article><span>KM</span><strong>{number(stability.hydro.km)} m</strong><small>Quilla → metacentro</small></article>
+            <article className={stability.gm <= 0 ? 'metric-alert' : ''}><span>GM corregido</span><strong>{number(stability.gm)} m</strong><small>KM − KG corregido</small></article>
+          </div>
+          <div className="live-insight">
+            <div className="pulse-icon">↗</div>
+            <div><span>Lectura rápida</span><strong>{stability.gm > 1 ? 'G está claramente por debajo de M: hay una reserva inicial amplia.' : stability.gm > 0 ? 'G aún está debajo de M, pero el margen se está reduciendo.' : 'G superó a M: prueba bajar KG o eliminar superficie libre.'}</strong></div>
+            <div className="gm-scale"><span>GM</span><div><i style={{ width: `${Math.max(0, Math.min(100, stability.gm / 2 * 100))}%` }} /></div><b>{number(stability.gm)} m</b></div>
+          </div>
+          <div className="missions-panel">
+            <div className="missions-heading"><div><p className="eyebrow">Aprende haciendo</p><h3>Misiones rápidas</h3></div><span>{[inputs.freeSurfaceMoment >= 3000, inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6, stability.gm <= 0].filter(Boolean).length}/3</span></div>
+            <div className="missions-grid">
+              <button className={inputs.freeSurfaceMoment >= 3000 ? 'done' : ''} onClick={() => setInputs({ ...initialState, freeSurfaceMoment: 4000 })}><i>{inputs.freeSurfaceMoment >= 3000 ? '✓' : '1'}</i><span><b>Haz visible la superficie libre</b><small>¿Cuánto GM se pierde?</small></span></button>
+              <button className={inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6 ? 'done' : ''} onClick={() => setInputs({ ...initialState, shiftedWeight: 400, shiftDistance: 8 })}><i>{inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6 ? '✓' : '2'}</i><span><b>Provoca una escora</b><small>Sigue el desplazamiento de G.</small></span></button>
+              <button className={stability.gm <= 0 ? 'done danger-done' : ''} onClick={() => setInputs({ ...initialState, kg: 7.3 })}><i>{stability.gm <= 0 ? '✓' : '3'}</i><span><b>Encuentra el límite</b><small>Eleva KG hasta superar M.</small></span></button>
+            </div>
           </div>
         </section>
 
-        <section className="workbench">
-          <div className="simulation-column">
-            <ShipScene data={stability} inputs={inputs} />
-            <div className="formula-strip">
-              <span><b>KM</b> = KB + BM</span><i />
-              <span><b>GM</b> = KM - KG - FSC</span><i />
-              <span><b>GZ</b> ≈ GM · sen θ</span>
-            </div>
+        <aside className="controls-panel">
+          <div className="panel-section">
+            <div className="section-heading"><div><p className="eyebrow">Experimenta</p><h2>Condición de carga</h2></div><button className="reset-button" onClick={() => setInputs(initialState)}>Restablecer</button></div>
+            <Slider label="Calado medio" value={inputs.draft} min={2.3} max={5.9} step={0.1} unit="m" help="Rango común cubierto por las tablas hidrostática y KN." onChange={set('draft')} />
+            <Slider label="Altura KG" value={inputs.kg} min={3} max={7.5} step={0.01} unit="m" help="Subir G reduce GM y normalmente reduce GZ." onChange={set('kg')} />
+            <Slider label="Momento de superficie libre" value={inputs.freeSurfaceMoment} min={0} max={4000} step={50} unit="t·m" help="Suma una elevación virtual a KG: FSM / Δ." onChange={set('freeSurfaceMoment')} />
+            <Slider label="Peso trasladado" value={inputs.shiftedWeight} min={0} max={500} step={10} unit="t" help="Peso que se mueve transversalmente." onChange={set('shiftedWeight')} />
+            <Slider label="Distancia hacia estribor" value={inputs.shiftDistance} min={0} max={8} step={0.1} unit="m" help="Genera un momento escorante w·d." onChange={set('shiftDistance')} />
           </div>
 
-          <aside className="controls-panel">
-            <div className="panel-heading">
-              <div><span className="section-kicker">PARAMETROS</span><h2>Configura el escenario</h2></div>
-              <Gauge size={22} />
-            </div>
+          <div className="preset-panel"><p className="eyebrow">Casos para comparar</p><div className="preset-grid">{presets.map((preset) => <button key={preset.label} onClick={() => setInputs(preset.values)}>{preset.label}</button>)}</div></div>
 
-            <div className="preset-row" aria-label="Escenarios predefinidos">
-              {presets.map((preset) => <button key={preset.label} className={`preset preset-${preset.className}`} onClick={() => setInputs((current) => ({ ...current, ...preset.values }))}>{preset.label}</button>)}
-            </div>
+          <div className={`interpretation status-${stability.statusColor}`}><strong>{stability.statusLabel}</strong><p>{stability.interpretation}</p></div>
+        </aside>
 
-            <div className="control-tabs">
-              <button className={controlGroup === 'ship' ? 'active' : ''} onClick={() => setControlGroup('ship')}><Waves size={16} /> Buque</button>
-              <button className={controlGroup === 'loads' ? 'active' : ''} onClick={() => setControlGroup('loads')}><Box size={16} /> Carga y lastre</button>
-            </div>
-
-            <div className="controls-scroll">
-              {controlGroup === 'ship' ? <>
-                <Slider label="Desplazamiento base" value={inputs.displacement} min={4000} max={26000} step={100} unit="t" onChange={update('displacement')} />
-                <Slider label="Eslora" value={inputs.length} min={70} max={220} step={1} unit="m" onChange={update('length')} />
-                <Slider label="Manga" value={inputs.beam} min={12} max={36} step={0.1} unit="m" hint="Aumentarla eleva fuertemente BM" onChange={update('beam')} />
-                <Slider label="Calado" value={inputs.draft} min={3} max={11} step={0.1} unit="m" onChange={update('draft')} />
-                <Slider label="Puntal" value={inputs.depth} min={7} max={16} step={0.1} unit="m" onChange={update('depth')} />
-                <Slider label="Altura del centro G (KG)" value={inputs.kg} min={2.5} max={12} step={0.05} unit="m" onChange={update('kg')} />
-                <Slider label="Posición transversal de G" value={inputs.kgOffset} min={-5} max={5} step={0.1} unit="m" onChange={update('kgOffset')} />
-                <Slider label="Altura del centro B (KB)" value={inputs.kb} min={1.5} max={5.5} step={0.05} unit="m" onChange={update('kb')} />
-              </> : <>
-                <Slider label="Peso de la carga movil" value={inputs.cargoWeight} min={0} max={1200} step={10} unit="t" onChange={update('cargoWeight')} />
-                <Slider label="Posición transversal carga" value={inputs.cargoOffset} min={-9} max={9} step={0.1} unit="m" hint="Negativo: babor · Positivo: estribor" onChange={update('cargoOffset')} />
-                <Slider label="Altura de la carga" value={inputs.cargoHeight} min={0.8} max={inputs.depth} step={0.1} unit="m" onChange={update('cargoHeight')} />
-                <Slider label="Nivel del tanque de lastre" value={inputs.ballastLevel} min={0} max={100} step={1} unit="%" hint={`${format(stability.ballastWeight, 0)} t de lastre`} onChange={update('ballastLevel')} />
-                <Slider label="Posición transversal lastre" value={inputs.ballastOffset} min={-7} max={7} step={0.1} unit="m" onChange={update('ballastOffset')} />
-                <div className="free-surface-note"><Info size={17} /><p><strong>Efecto de superficie libre</strong>Un tanque parcialmente lleno reduce GM en {format(stability.freeSurfaceCorrection)} m.</p></div>
-              </>}
-            </div>
-          </aside>
+        <section className="chart-panel">
+          <div className="chart-heading"><div><p className="eyebrow">Pantocarenas del Buque Echo</p><h2>Curva de brazos adrizantes</h2></div><div className="formula-pill">GZ = KN − KG<sub>corr</sub> · sen θ − GG′ · cos θ</div></div>
+          <StabilityChart data={stability.curve} currentAngle={stability.heelAngle} />
+          <div className="chart-stats"><span><b>{number(stability.maxGz)} m</b> GZ máximo a {number(stability.maxGzAngle, 1)}°</span><span><b>{number(stability.positiveRange, 1)}°</b> rango positivo</span><span><b>{number(stability.heelAngle, 1)}°</b> escora de equilibrio</span></div>
         </section>
 
-        <section className="metrics-grid">
-          <Metric label="ALTURA METACENTRICA" value={format(stability.gm)} unit="m" detail={`KM ${format(stability.km)} m - KG efectivo ${format(stability.effectiveKg)} m`} tone={stability.gm < 0.45 ? 'warning' : ''} />
-          <Metric label="BRAZO ADRIZANTE" value={format(stability.gz)} unit="m" detail={`A ${format(Math.abs(stability.heelAngle), 1)}° de escora`} />
-          <Metric label="MOMENTO ADRIZANTE" value={format(stability.rightingMoment / 1000, 1)} unit="MN·m" detail={`Desplazamiento total ${format(stability.totalDisplacement, 0)} t`} />
-          <Metric label="RADIO METACÉNTRICO" value={format(stability.bm)} unit="m" detail="BM = I de flotación / volumen" />
-          <Metric label="GZ MÁXIMO" value={format(stability.maxGz)} unit="m" detail={`Máximo cerca de ${format(stability.maxGzAngle, 1)}°`} />
-        </section>
-
-        <section className="analysis-grid">
-          <div className="chart-section">
-            <div className="section-heading"><div><span className="section-kicker">RESERVA DE ESTABILIDAD</span><h2>Curva de brazos adrizantes</h2></div><span className="angle-readout">θ {format(Math.abs(stability.heelAngle), 1)}°</span></div>
-            <StabilityChart data={stability.curve} currentAngle={Math.abs(stability.heelAngle)} downfloodAngle={stability.downfloodAngle} />
+        <section className="calculation-panel">
+          <div><p className="eyebrow">Cuaderno de cálculo</p><h2>De los datos al resultado</h2><p>Cada tarjeta muestra la operación usada. Cambia un control y sigue la cadena de efectos.</p></div>
+          <div className="calculation-grid">
+            <article><span>01 · Tabla hidrostática</span><code>T = {number(inputs.draft, 1)} m → Δ = {number(stability.hydro.displacement, 0)} t</code><p>También obtenemos KM = {number(stability.hydro.km)} m y TPC = {number(stability.hydro.tpc)} t/cm.</p></article>
+            <article><span>02 · Superficie libre</span><code>FSC = {number(inputs.freeSurfaceMoment, 0)} / {number(stability.hydro.displacement, 0)} = {number(stability.freeSurfaceCorrection, 3)} m</code><p>KG corregido = {number(inputs.kg)} + {number(stability.freeSurfaceCorrection, 3)} = {number(stability.correctedKg, 3)} m.</p></article>
+            <article><span>03 · Altura metacéntrica</span><code>GM = {number(stability.hydro.km)} − {number(stability.correctedKg, 3)} = {number(stability.gm, 3)} m</code><p>El signo de GM describe la estabilidad para inclinaciones pequeñas.</p></article>
+            <article><span>04 · Traslado transversal</span><code>GG′ = ({number(inputs.shiftedWeight, 0)} × {number(inputs.shiftDistance, 1)}) / {number(stability.hydro.displacement, 0)} = {number(stability.transverseG, 3)} m</code><p>Momento escorante: {number(stability.heelingMoment, 0)} t·m.</p></article>
           </div>
-          <aside className={`assessment assessment-${stability.status}`}>
-            <div className="assessment-icon"><MoveHorizontal size={23} /></div>
-            <span className="section-kicker">LECTURA DEL ESCENARIO</span>
-            <h2>{stability.statusLabel}</h2>
-            <p>{stability.interpretation}</p>
-            <dl>
-              <div><dt>Escora de equilibrio</dt><dd>{format(stability.heelAngle, 1)}°</dd></div>
-              <div><dt>Ángulo de inundación</dt><dd>{format(stability.downfloodAngle, 1)}°</dd></div>
-              <div><dt>Rango positivo estimado</dt><dd>{format(stability.rangeOfStability, 1)}°</dd></div>
-            </dl>
-          </aside>
         </section>
 
-        <footer><Info size={15} /> Modelo educativo simplificado. No utilizar para decisiones operativas: consulte la información de estabilidad aprobada del buque.</footer>
+        <section className="reference-panel">
+          <div><p className="eyebrow">Ficha del buque</p><h2>Buque Echo · condición de verano</h2></div>
+          <dl><div><dt>Eslora entre PP</dt><dd>110 m</dd></div><div><dt>Manga</dt><dd>17,30 m</dd></div><div><dt>Puntal</dt><dd>6,15 m</dd></div><div><dt>Calado</dt><dd>5,80 m</dd></div><div><dt>Desplazamiento</dt><dd>8.200 t</dd></div><div><dt>KG normal</dt><dd>5,39 m</dd></div></dl>
+          <p className="source-note">Modelo educativo basado en las tablas hidrostáticas, tabla KN y ficha de centros de gravedad suministradas para el curso. La interpolación es lineal; no sustituye el cuaderno de estabilidad aprobado del buque.</p>
+        </section>
       </main>
     </div>
   );

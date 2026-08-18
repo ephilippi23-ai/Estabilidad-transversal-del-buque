@@ -1,32 +1,37 @@
-# TrimLab - estabilidad transversal
+# Laboratorio de estabilidad transversal · Buque Echo
 
-Simulador educativo interactivo para explorar la estabilidad transversal de un buque. La interfaz muestra en tiempo real la escora, los centros G/B/M, las fuerzas, GM, GZ, momento adrizante, efecto de superficie libre y curva de brazos adrizantes.
+Simulador educativo interactivo para estudiar la estabilidad transversal con los datos del Buque Echo utilizados en el curso.
 
-## Iniciar en esta Mac
+## Contenidos
 
-La forma mas simple es hacer doble clic en `start.command`. Se abrira automaticamente:
+- Relación entre calado, desplazamiento, KB, KM y TPC mediante la tabla hidrostática.
+- Vistas transversal y longitudinal del buque, con Xb, Xf y MCT 1 cm.
+- Estabilidad inicial y cálculo de `GM = KM − KG corregido`.
+- Corrección virtual de KG por superficies libres.
+- Traslado transversal de pesos, momento escorante y corrimiento de G.
+- Curva de brazos adrizantes a partir de pantocarenas: `GZ = KN − KG·sen θ`.
+- Casos comparativos y cuaderno de cálculo visible paso a paso.
 
-`http://localhost:5173`
+Los valores intermedios se calculan mediante interpolación lineal. El rango del simulador se limita a la zona común de las tablas hidrostática y KN suministradas.
 
-Desde Terminal, el equivalente es:
+## Ejecutar el proyecto
 
-```bash
-cd /Users/ephil/Documents/CHATGPT
-./start.command
-```
-
-Para detener el servidor, pulse `Control + C` en la ventana de Terminal.
-
-## Desarrollo
+Requiere una versión reciente de Node.js:
 
 ```bash
 npm install
 npm run dev
-npm run build
 ```
 
-El proyecto usa React, TypeScript y Vite. En esta maquina tambien se incluye un runtime local ignorado por Git en `.tools/node`, por lo que `start.command` funciona aunque Node.js no este instalado globalmente.
+Para comprobar la versión de producción:
 
-## Alcance del modelo
+```bash
+npm run build
+npm run preview
+```
 
-El calculo combina momentos de pesos, volumen desplazado en agua de mar, inercia transversal de la flotacion y correccion por superficie libre. La curva GZ a grandes angulos es una aproximacion didactica. No sustituye las curvas KN, condiciones de carga ni el cuaderno de estabilidad aprobado del buque.
+## Material académico
+
+La carpeta local `ayudas/` contiene la documentación original del curso y está excluida de Git mediante `.gitignore`. Los datos necesarios para el funcionamiento del simulador fueron transcritos al modelo de cálculo; los documentos originales no se publican en el repositorio.
+
+Este simulador es una herramienta educativa. No sustituye las curvas, las condiciones de carga ni el cuaderno de estabilidad aprobado de un buque.

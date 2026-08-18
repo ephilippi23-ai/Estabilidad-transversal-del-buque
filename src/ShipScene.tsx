@@ -1,85 +1,52 @@
-import type { Inputs, StabilityResult } from './stability';
+import { Inputs, StabilityResult } from './stability';
 
 type Props = { data: StabilityResult; inputs: Inputs };
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export function ShipScene({ data, inputs }: Props) {
-  const cx = 410;
-  const pivotY = 318;
-  const deckY = 192;
-  const keelY = 416;
-  const beamPixels = clamp(inputs.beam * 13.5, 220, 440);
-  const half = beamPixels / 2;
-  const heel = data.heelAngle;
-  const pxPerMeter = 190 / Math.max(inputs.depth, 1);
-  const localG = { x: cx + data.effectiveGOffset * pxPerMeter, y: keelY - data.effectiveKg * pxPerMeter };
-  const localB = { x: cx + Math.sin(heel * Math.PI / 180) * data.bm * pxPerMeter, y: keelY - data.kb * pxPerMeter };
-  const localM = { x: cx, y: keelY - data.km * pxPerMeter };
-  const cargoX = cx + inputs.cargoOffset * pxPerMeter;
-  const cargoY = keelY - inputs.cargoHeight * pxPerMeter;
-  const tankX = cx + inputs.ballastOffset * pxPerMeter;
-
-  const rotate = (point: { x: number; y: number }) => {
-    const angle = heel * Math.PI / 180;
-    const dx = point.x - cx;
-    const dy = point.y - pivotY;
-    return { x: cx + dx * Math.cos(angle) - dy * Math.sin(angle), y: pivotY + dx * Math.sin(angle) + dy * Math.cos(angle) };
-  };
-  const g = rotate(localG);
-  const b = rotate(localB);
-  const m = rotate(localM);
-  const gzLeft = Math.min(g.x, b.x);
-  const gzWidth = Math.abs(g.x - b.x);
-  const fillHeight = 40 * inputs.ballastLevel / 100;
-
-  const hullPath = `M ${cx - half} ${deckY} Q ${cx - half + 15} 344 ${cx - 54} ${keelY} Q ${cx} 444 ${cx + 54} ${keelY} Q ${cx + half - 15} 344 ${cx + half} ${deckY} Z`;
+  const centerX = 300; const keelY = 275; const pxPerMeter = 22;
+  const pointY = (height: number) => clamp(keelY - height * pxPerMeter, 34, keelY);
+  const waterY = pointY(inputs.draft);
+  const heel = clamp(data.heelAngle, 0, 28);
+  const cargoX = centerX + (inputs.shiftDistance / 8) * 118;
+  const tankLevel = clamp(inputs.freeSurfaceMoment / 4000, 0, 1);
 
   return (
-    <section className="ship-viewport" aria-label="Vista transversal animada del buque">
-      <div className="viewport-heading">
-        <div><span className="section-kicker">SECCION MAESTRA</span><h2>Equilibrio transversal</h2></div>
-        <div className="heel-display"><span>ESCORA</span><strong>{data.heelAngle > 0 ? 'E' : data.heelAngle < 0 ? 'B' : ''} {Math.abs(data.heelAngle).toFixed(1)}°</strong></div>
-      </div>
-      <svg viewBox="0 0 820 500" role="img" aria-label={`Buque con ${Math.abs(data.heelAngle).toFixed(1)} grados de escora`}>
-        <defs>
-          <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#137f9b" stopOpacity=".5"/><stop offset="1" stopColor="#073746" stopOpacity=".9"/></linearGradient>
-          <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#e8edf0"/><stop offset=".12" stopColor="#9caab0"/><stop offset=".14" stopColor="#182c35"/><stop offset="1" stopColor="#091b23"/></linearGradient>
-          <linearGradient id="tank" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#39c7df"/><stop offset="1" stopColor="#10728a"/></linearGradient>
-          <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#8ec5d0" strokeOpacity=".06"/></pattern>
-          <marker id="arrowGold" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#f1b84b"/></marker>
-          <marker id="arrowCyan" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#53d3e7"/></marker>
-          <clipPath id="hullClip"><path d={hullPath}/></clipPath>
-        </defs>
-        <rect width="820" height="500" fill="url(#grid)"/>
-        <g opacity=".65"><path d="M0 304 Q55 295 110 304T220 304T330 304T440 304T550 304T660 304T770 304T880 304V500H0Z" fill="url(#sea)"/><path d="M0 304 Q55 295 110 304T220 304T330 304T440 304T550 304T660 304T770 304T880 304" fill="none" stroke="#8ee3ee" strokeWidth="2"/></g>
-        <text x="22" y="291" className="scene-muted">LINEA DE FLOTACION</text>
+    <div className="ship-card">
+      <div className="ship-card-heading"><div><p className="eyebrow">Sección transversal</p><h2>¿Dónde están G, B y M?</h2></div><div className="heel-readout"><b>{data.heelAngle.toFixed(1)}°</b><span>escora</span></div></div>
+      <div className="ship-canvas">
+        <svg viewBox="0 0 600 390" role="img" aria-label="Sección transversal didáctica del Buque Echo">
+          <defs>
+            <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#187b98" stopOpacity=".7"/><stop offset="1" stopColor="#062e48" stopOpacity=".95"/></linearGradient>
+            <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#e8edf0"/><stop offset="1" stopColor="#788892"/></linearGradient>
+            <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,8 L4,0 L8,8" fill="none" stroke="#58d9ff" strokeWidth="1.5"/></marker>
+            <marker id="arrowGold" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L4,8 L8,0" fill="none" stroke="#ffd166" strokeWidth="1.5"/></marker>
+          </defs>
+          <rect x="0" y={waterY} width="600" height={390-waterY} fill="url(#sea)"/>
+          <path d={`M0 ${waterY} Q75 ${waterY-5} 150 ${waterY} T300 ${waterY} T450 ${waterY} T600 ${waterY}`} fill="none" stroke="#80ddf2" strokeWidth="3"/>
+          <text x="24" y={waterY-12} className="svg-muted">Flotación · T = {inputs.draft.toFixed(1)} m</text>
 
-        <g className="vessel" style={{ transform: `rotate(${heel}deg)`, transformOrigin: `${cx}px ${pivotY}px` }}>
-          <path d={hullPath} fill="url(#hull)" stroke="#b8d1d5" strokeWidth="2"/>
-          <path d={`M${cx - half + 14} ${deckY}H${cx + half - 14}`} stroke="#f4f6f2" strokeWidth="5"/>
-          <path d={`M${cx - half + 30} 230H${cx + half - 30}M${cx - half + 50} 275H${cx + half - 50}`} stroke="#91a8ae" strokeOpacity=".28"/>
-          <g clipPath="url(#hullClip)">
-            <rect x={tankX - 68} y={keelY - 53} width="136" height="46" rx="3" fill="#071b24" stroke="#3a8290"/>
-            <rect x={tankX - 66} y={keelY - 9 - fillHeight} width="132" height={fillHeight} fill="url(#tank)" opacity=".9"/>
-            {inputs.ballastLevel > 2 && inputs.ballastLevel < 98 && <path d={`M${tankX - 64} ${keelY - 10 - fillHeight}q22 -4 44 0t44 0t44 0`} fill="none" stroke="#b2f3fa" strokeWidth="1.5"/>}
+          <g transform={`rotate(${heel} ${centerX} ${waterY})`}>
+            <path d="M155 112 L445 112 L430 202 Q412 270 300 292 Q188 270 170 202 Z" fill="url(#hull)" stroke="#eef7fb" strokeWidth="3"/>
+            <path d="M172 202 Q300 224 428 202" fill="none" stroke="#273c47" strokeWidth="2" opacity=".45"/>
+            <rect x="185" y="122" width="230" height="24" rx="5" fill="#233b48" opacity=".75"/>
+            <rect x="209" y="239" width="72" height="34" rx="5" fill="#143f55" stroke="#62c9e6"/>
+            {tankLevel > 0 && <rect x="212" y={268-25*tankLevel} width="66" height={25*tankLevel} rx="3" fill="#5bc9e8" opacity=".8"/>}
+            <line x1="212" y1={252-tankLevel*4} x2="278" y2={252+tankLevel*4} stroke="#c8f5ff" strokeWidth="2"/>
+            <text x="245" y="288" textAnchor="middle" className="svg-muted">tanque</text>
+            {inputs.shiftedWeight > 0 && <g><rect x={cargoX-18} y="151" width="36" height="30" rx="5" fill="#f4a261"/><text x={cargoX} y="171" textAnchor="middle" className="svg-dark">w</text></g>}
           </g>
-          <g transform={`translate(${cargoX} ${cargoY})`} className="cargo"><rect x="-23" y="-19" width="46" height="38" rx="3" fill="#cf8248" stroke="#ffd2a6" strokeWidth="2"/><path d="M-23 -4H23M0 -19V19" stroke="#6f3a21" opacity=".65"/><text y="5" textAnchor="middle">C</text></g>
-          <circle cx={localG.x} cy={localG.y} r="7" className="point point-g"/>
-          <circle cx={localB.x} cy={localB.y} r="7" className="point point-b"/>
-          <circle cx={localM.x} cy={localM.y} r="7" className="point point-m"/>
-        </g>
 
-        <line x1={g.x} y1={g.y - 1} x2={g.x} y2={465} stroke="#f1b84b" strokeWidth="2.5" markerEnd="url(#arrowGold)"/>
-        <line x1={b.x} y1={b.y + 1} x2={b.x} y2={94} stroke="#53d3e7" strokeWidth="2.5" markerEnd="url(#arrowCyan)"/>
-        <line x1={g.x} y1={g.y} x2={m.x} y2={m.y} stroke="#d8e5e7" strokeDasharray="5 5"/>
-        {gzWidth > 2 && <g><line x1={gzLeft} y1={151} x2={gzLeft + gzWidth} y2={151} stroke="#ed806b" strokeWidth="3"/><path d={`M${gzLeft} 145v12M${gzLeft + gzWidth} 145v12`} stroke="#ed806b"/><text x={gzLeft + gzWidth / 2} y="139" textAnchor="middle" className="gz-label">GZ {data.gz.toFixed(2)} m</text></g>}
-
-        <g transform={`translate(${g.x + 12} ${g.y - 10})`}><rect className="tag-bg" width="31" height="23"/><text x="15.5" y="16" textAnchor="middle" className="tag tag-g">G</text></g>
-        <g transform={`translate(${b.x + 12} ${b.y + 8})`}><rect className="tag-bg" width="31" height="23"/><text x="15.5" y="16" textAnchor="middle" className="tag tag-b">B</text></g>
-        <g transform={`translate(${m.x + 12} ${m.y - 12})`}><rect className="tag-bg" width="31" height="23"/><text x="15.5" y="16" textAnchor="middle" className="tag tag-m">M</text></g>
-        <g transform="translate(24 443)" className="scene-legend"><circle cx="5" cy="5" r="5" className="point-g"/><text x="17" y="9">G gravedad</text><circle cx="116" cy="5" r="5" className="point-b"/><text x="128" y="9">B carena</text><circle cx="213" cy="5" r="5" className="point-m"/><text x="225" y="9">M metacentro</text></g>
-        <text x="796" y="482" textAnchor="end" className="scene-muted">BABOR ←  |  → ESTRIBOR</text>
-      </svg>
-    </section>
+          <line x1={centerX} y1={pointY(data.hydro.kb)+42} x2={centerX} y2={pointY(data.hydro.kb)-42} stroke="#58d9ff" strokeWidth="2" markerEnd="url(#arrowBlue)"/>
+          <line x1={centerX+data.transverseG*150} y1={pointY(data.correctedKg)-42} x2={centerX+data.transverseG*150} y2={pointY(data.correctedKg)+42} stroke="#ffd166" strokeWidth="2" markerEnd="url(#arrowGold)"/>
+          <g className="point point-b"><circle cx={centerX} cy={pointY(data.hydro.kb)} r="10"/><text x={centerX+16} y={pointY(data.hydro.kb)+5}>B · {data.hydro.kb.toFixed(2)} m</text></g>
+          <g className="point point-g"><circle cx={centerX+data.transverseG*150} cy={pointY(data.correctedKg)} r="10"/><text x={centerX+16+data.transverseG*150} y={pointY(data.correctedKg)-12}>G · {data.correctedKg.toFixed(2)} m</text></g>
+          <g className="point point-m"><circle cx={centerX} cy={pointY(data.hydro.km)} r="10"/><text x={centerX+16} y={pointY(data.hydro.km)+5}>M · {data.hydro.km.toFixed(2)} m</text></g>
+          <line x1="500" y1={pointY(data.correctedKg)} x2="500" y2={pointY(data.hydro.km)} stroke={data.gm >= 0 ? '#6ee7a0' : '#ff6b6b'} strokeWidth="5"/>
+          <text x="515" y={(pointY(data.correctedKg)+pointY(data.hydro.km))/2+4} className="svg-label">GM</text>
+          <text x="22" y="365" className="svg-muted">Las alturas se representan desde la quilla; la rotación se amplifica solo hasta 28° para facilitar la lectura.</text>
+        </svg>
+      </div>
+    </div>
   );
 }

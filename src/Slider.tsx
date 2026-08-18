@@ -1,27 +1,18 @@
 type SliderProps = {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit: string;
-  hint?: string;
-  onChange: (value: number) => void;
+  label: string; value: number; min: number; max: number; step: number;
+  unit: string; help: string; onChange: (value: number) => void;
 };
 
-export function Slider({ label, value, min, max, step, unit, hint, onChange }: SliderProps) {
-  const progress = ((value - min) / (max - min)) * 100;
+export function Slider({ label, value, min, max, step, unit, help, onChange }: SliderProps) {
+  const update = (raw: string) => {
+    const next = Number(raw);
+    if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
+  };
   return (
-    <label className="control-row">
-      <span className="control-copy">
-        <strong>{label}</strong>
-        {hint && <small>{hint}</small>}
-      </span>
-      <span className="control-value">
-        <input type="number" value={value} min={min} max={max} step={step} aria-label={`${label} en ${unit}`} onChange={(event) => onChange(Number(event.target.value))} />
-        <span>{unit}</span>
-      </span>
-      <input className="range" type="range" value={value} min={min} max={max} step={step} style={{ '--progress': `${progress}%` } as React.CSSProperties} onChange={(event) => onChange(Number(event.target.value))} />
-    </label>
+    <div className="slider-row">
+      <div className="slider-label"><label htmlFor={`slider-${label}`}>{label}</label><output>{value.toLocaleString('es-UY')} <small>{unit}</small></output></div>
+      <input id={`slider-${label}`} type="range" value={value} min={min} max={max} step={step} onChange={(event) => update(event.target.value)} />
+      <p>{help}</p>
+    </div>
   );
 }
