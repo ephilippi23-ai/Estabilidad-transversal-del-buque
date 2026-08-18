@@ -1,132 +1,149 @@
 import { useMemo, useState } from 'react';
-import { calculateStability } from './stability';
+import { Activity, Anchor, Box, Gauge, Info, MoveHorizontal, RotateCcw, Waves } from 'lucide-react';
+import { calculateStability, type Inputs } from './stability';
 import { ShipScene } from './ShipScene';
 import { StabilityChart } from './StabilityChart';
 import { Slider } from './Slider';
 
-const initialState = {
-  displacement: 12000,
-  beam: 20,
-  draft: 7.5,
-  depth: 12,
-  kg: 6.3,
+const initialInputs: Inputs = {
+  displacement: 11800,
+  length: 142,
+  beam: 21.5,
+  draft: 7.1,
+  depth: 11.8,
+  kg: 8.6,
   kgOffset: 0,
-  kb: 2.1,
-  ballast: 1000,
-  ballastOffset: 0,
-  cargoWeight: 300,
+  kb: 3.65,
+  cargoWeight: 420,
   cargoOffset: 4,
+  cargoHeight: 9.5,
+  ballastLevel: 52,
+  ballastOffset: -1.2,
 };
 
-const stateBounds = {
-  displacement: { min: 5000, max: 30000, step: 100 },
-  beam: { min: 10, max: 40, step: 0.1 },
-  draft: { min: 3, max: 12, step: 0.1 },
-  depth: { min: 8, max: 20, step: 0.1 },
-  kg: { min: 2, max: 12, step: 0.05 },
-  kgOffset: { min: -5, max: 5, step: 0.1 },
-  kb: { min: 1, max: 6, step: 0.05 },
-  ballast: { min: 0, max: 5000, step: 50 },
-  ballastOffset: { min: -5, max: 5, step: 0.1 },
-  cargoWeight: { min: 0, max: 1000, step: 10 },
-  cargoOffset: { min: -8, max: 8, step: 0.1 },
-};
+const presets: Array<{ label: string; className: string; values: Partial<Inputs> }> = [
+  { label: 'Equilibrado', className: 'good', values: initialInputs },
+  { label: 'Carga alta', className: 'reduced', values: { kg: 9.3, cargoWeight: 780, cargoHeight: 10.8, cargoOffset: 5.8, ballastLevel: 18, ballastOffset: 0 } },
+  { label: 'Lastre bajo', className: 'stiff', values: { kg: 6.2, cargoWeight: 180, cargoHeight: 5.2, cargoOffset: 0, ballastLevel: 100, ballastOffset: 0 } },
+];
 
-const metricLabel = (value: number, unit = '') => `${value.toFixed(2)}${unit}`;
+const format = (value: number, digits = 2) => value.toLocaleString('es-ES', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+
+function Metric({ label, value, unit, detail, tone }: { label: string; value: string; unit: string; detail: string; tone?: string }) {
+  return (
+    <article className={`metric ${tone ?? ''}`}>
+      <span>{label}</span>
+      <strong>{value}<small>{unit}</small></strong>
+      <p>{detail}</p>
+    </article>
+  );
+}
 
 function App() {
-  const [inputs, setInputs] = useState(initialState);
-
+  const [inputs, setInputs] = useState(initialInputs);
+  const [controlGroup, setControlGroup] = useState<'ship' | 'loads'>('ship');
   const stability = useMemo(() => calculateStability(inputs), [inputs]);
+  const update = (key: keyof Inputs) => (value: number) => setInputs((current) => ({ ...current, [key]: value }));
 
   return (
-    <div className="page-shell">
-      <header className="hero-panel">
-        <div>
-          <p className="eyebrow">Simulador educativo</p>
-          <h1>Estabilidad transversal de un buque</h1>
-          <p className="hero-copy">
-            Explora cómo cambian la escora, el metacentro y el brazo adrizante cuando ajustas los parámetros clave del barco.
-          </p>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand-mark"><Anchor size={21} /></div>
+        <div className="brand-copy">
+          <strong>TRIMLAB</strong>
+          <span>Estabilidad transversal</span>
         </div>
-        <div className={`status-badge status-${stability.statusColor}`}>
-          <span>{stability.statusLabel}</span>
-        </div>
+        <div className="topbar-spacer" />
+        <span className="live-indicator"><i /> SIMULACION ACTIVA</span>
+        <button className="icon-button" title="Restablecer escenario" aria-label="Restablecer escenario" onClick={() => setInputs(initialInputs)}><RotateCcw size={18} /></button>
       </header>
 
-      <main className="layout-grid">
-        <section className="visual-panel">
-          <ShipScene data={stability} inputs={inputs} />
-          <div className="cards-grid">
-            <div className="card">
-              <h2>GM</h2>
-              <p>{metricLabel(stability.gm, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>GZ actual</h2>
-              <p>{metricLabel(stability.gz, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>Metacentro M</h2>
-              <p>{metricLabel(stability.metalCenterHeight, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>Ángulo de escora</h2>
-              <p>{metricLabel(stability.heelAngle, '°')}</p>
-            </div>
-            <div className="card">
-              <h2>KB</h2>
-              <p>{metricLabel(stability.bHeight, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>BM</h2>
-              <p>{metricLabel(stability.bm, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>Max GZ</h2>
-              <p>{metricLabel(stability.maxGz, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>Centro de gravedad G</h2>
-              <p>{metricLabel(stability.gHeight, ' m')} / {metricLabel(stability.gOffset, ' m')}</p>
-            </div>
-            <div className="card">
-              <h2>Desplazamiento</h2>
-              <p>{metricLabel(inputs.displacement, ' t')}</p>
-            </div>
+      <main>
+        <section className="intro-row">
+          <div>
+            <span className="section-kicker">LABORATORIO INTERACTIVO</span>
+            <h1>Comprende por que un buque vuelve a adrizarse.</h1>
+          </div>
+          <div className={`condition condition-${stability.status}`}>
+              <Activity size={19} />
+            <div><span>CONDICION ACTUAL</span><strong>{stability.statusLabel}</strong></div>
           </div>
         </section>
 
-        <section className="controls-panel">
-          <div className="panel-section">
-            <h2>Parámetros del buque</h2>
-            <Slider label="Desplazamiento (t)" value={inputs.displacement} min={stateBounds.displacement.min} max={stateBounds.displacement.max} step={stateBounds.displacement.step} onChange={(value) => setInputs((prev) => ({ ...prev, displacement: value }))} />
-            <Slider label="Manga (m)" value={inputs.beam} min={stateBounds.beam.min} max={stateBounds.beam.max} step={stateBounds.beam.step} onChange={(value) => setInputs((prev) => ({ ...prev, beam: value }))} />
-            <Slider label="Calado (m)" value={inputs.draft} min={stateBounds.draft.min} max={stateBounds.draft.max} step={stateBounds.draft.step} onChange={(value) => setInputs((prev) => ({ ...prev, draft: value }))} />
-            <Slider label="Puntal / francobordo (m)" value={inputs.depth} min={stateBounds.depth.min} max={stateBounds.depth.max} step={stateBounds.depth.step} onChange={(value) => setInputs((prev) => ({ ...prev, depth: value }))} />
-            <Slider label="Altura KG (m)" value={inputs.kg} min={stateBounds.kg.min} max={stateBounds.kg.max} step={stateBounds.kg.step} onChange={(value) => setInputs((prev) => ({ ...prev, kg: value }))} />
+        <section className="workbench">
+          <div className="simulation-column">
+            <ShipScene data={stability} inputs={inputs} />
+            <div className="formula-strip">
+              <span><b>KM</b> = KB + BM</span><i />
+              <span><b>GM</b> = KM - KG - FSC</span><i />
+              <span><b>GZ</b> ≈ GM · sen θ</span>
+            </div>
           </div>
 
-          <div className="panel-section">
-            <h2>Centro de gravedad</h2>
-            <Slider label="Posición transversal G (m)" value={inputs.kgOffset} min={stateBounds.kgOffset.min} max={stateBounds.kgOffset.max} step={stateBounds.kgOffset.step} onChange={(value) => setInputs((prev) => ({ ...prev, kgOffset: value }))} />
-            <Slider label="Altura KB (m)" value={inputs.kb} min={stateBounds.kb.min} max={stateBounds.kb.max} step={stateBounds.kb.step} onChange={(value) => setInputs((prev) => ({ ...prev, kb: value }))} />
-            <Slider label="Peso lastre (t)" value={inputs.ballast} min={stateBounds.ballast.min} max={stateBounds.ballast.max} step={stateBounds.ballast.step} onChange={(value) => setInputs((prev) => ({ ...prev, ballast: value }))} />
-            <Slider label="Offset transversal lastre (m)" value={inputs.ballastOffset} min={stateBounds.ballastOffset.min} max={stateBounds.ballastOffset.max} step={stateBounds.ballastOffset.step} onChange={(value) => setInputs((prev) => ({ ...prev, ballastOffset: value }))} />
-            <Slider label="Peso de carga móvil (t)" value={inputs.cargoWeight} min={stateBounds.cargoWeight.min} max={stateBounds.cargoWeight.max} step={stateBounds.cargoWeight.step} onChange={(value) => setInputs((prev) => ({ ...prev, cargoWeight: value }))} />
-            <Slider label="Posición transversal carga (m)" value={inputs.cargoOffset} min={stateBounds.cargoOffset.min} max={stateBounds.cargoOffset.max} step={stateBounds.cargoOffset.step} onChange={(value) => setInputs((prev) => ({ ...prev, cargoOffset: value }))} />
-          </div>
+          <aside className="controls-panel">
+            <div className="panel-heading">
+              <div><span className="section-kicker">PARAMETROS</span><h2>Configura el escenario</h2></div>
+              <Gauge size={22} />
+            </div>
 
-          <div className={`legend-box status-panel status-${stability.statusColor}`}>
-            <p><strong>Interpretación:</strong></p>
+            <div className="preset-row" aria-label="Escenarios predefinidos">
+              {presets.map((preset) => <button key={preset.label} className={`preset preset-${preset.className}`} onClick={() => setInputs((current) => ({ ...current, ...preset.values }))}>{preset.label}</button>)}
+            </div>
+
+            <div className="control-tabs">
+              <button className={controlGroup === 'ship' ? 'active' : ''} onClick={() => setControlGroup('ship')}><Waves size={16} /> Buque</button>
+              <button className={controlGroup === 'loads' ? 'active' : ''} onClick={() => setControlGroup('loads')}><Box size={16} /> Carga y lastre</button>
+            </div>
+
+            <div className="controls-scroll">
+              {controlGroup === 'ship' ? <>
+                <Slider label="Desplazamiento base" value={inputs.displacement} min={4000} max={26000} step={100} unit="t" onChange={update('displacement')} />
+                <Slider label="Eslora" value={inputs.length} min={70} max={220} step={1} unit="m" onChange={update('length')} />
+                <Slider label="Manga" value={inputs.beam} min={12} max={36} step={0.1} unit="m" hint="Aumentarla eleva fuertemente BM" onChange={update('beam')} />
+                <Slider label="Calado" value={inputs.draft} min={3} max={11} step={0.1} unit="m" onChange={update('draft')} />
+                <Slider label="Puntal" value={inputs.depth} min={7} max={16} step={0.1} unit="m" onChange={update('depth')} />
+                <Slider label="Altura del centro G (KG)" value={inputs.kg} min={2.5} max={12} step={0.05} unit="m" onChange={update('kg')} />
+                <Slider label="Posición transversal de G" value={inputs.kgOffset} min={-5} max={5} step={0.1} unit="m" onChange={update('kgOffset')} />
+                <Slider label="Altura del centro B (KB)" value={inputs.kb} min={1.5} max={5.5} step={0.05} unit="m" onChange={update('kb')} />
+              </> : <>
+                <Slider label="Peso de la carga movil" value={inputs.cargoWeight} min={0} max={1200} step={10} unit="t" onChange={update('cargoWeight')} />
+                <Slider label="Posición transversal carga" value={inputs.cargoOffset} min={-9} max={9} step={0.1} unit="m" hint="Negativo: babor · Positivo: estribor" onChange={update('cargoOffset')} />
+                <Slider label="Altura de la carga" value={inputs.cargoHeight} min={0.8} max={inputs.depth} step={0.1} unit="m" onChange={update('cargoHeight')} />
+                <Slider label="Nivel del tanque de lastre" value={inputs.ballastLevel} min={0} max={100} step={1} unit="%" hint={`${format(stability.ballastWeight, 0)} t de lastre`} onChange={update('ballastLevel')} />
+                <Slider label="Posición transversal lastre" value={inputs.ballastOffset} min={-7} max={7} step={0.1} unit="m" onChange={update('ballastOffset')} />
+                <div className="free-surface-note"><Info size={17} /><p><strong>Efecto de superficie libre</strong>Un tanque parcialmente lleno reduce GM en {format(stability.freeSurfaceCorrection)} m.</p></div>
+              </>}
+            </div>
+          </aside>
+        </section>
+
+        <section className="metrics-grid">
+          <Metric label="ALTURA METACENTRICA" value={format(stability.gm)} unit="m" detail={`KM ${format(stability.km)} m - KG efectivo ${format(stability.effectiveKg)} m`} tone={stability.gm < 0.45 ? 'warning' : ''} />
+          <Metric label="BRAZO ADRIZANTE" value={format(stability.gz)} unit="m" detail={`A ${format(Math.abs(stability.heelAngle), 1)}° de escora`} />
+          <Metric label="MOMENTO ADRIZANTE" value={format(stability.rightingMoment / 1000, 1)} unit="MN·m" detail={`Desplazamiento total ${format(stability.totalDisplacement, 0)} t`} />
+          <Metric label="RADIO METACÉNTRICO" value={format(stability.bm)} unit="m" detail="BM = I de flotación / volumen" />
+          <Metric label="GZ MÁXIMO" value={format(stability.maxGz)} unit="m" detail={`Máximo cerca de ${format(stability.maxGzAngle, 1)}°`} />
+        </section>
+
+        <section className="analysis-grid">
+          <div className="chart-section">
+            <div className="section-heading"><div><span className="section-kicker">RESERVA DE ESTABILIDAD</span><h2>Curva de brazos adrizantes</h2></div><span className="angle-readout">θ {format(Math.abs(stability.heelAngle), 1)}°</span></div>
+            <StabilityChart data={stability.curve} currentAngle={Math.abs(stability.heelAngle)} downfloodAngle={stability.downfloodAngle} />
+          </div>
+          <aside className={`assessment assessment-${stability.status}`}>
+            <div className="assessment-icon"><MoveHorizontal size={23} /></div>
+            <span className="section-kicker">LECTURA DEL ESCENARIO</span>
+            <h2>{stability.statusLabel}</h2>
             <p>{stability.interpretation}</p>
-          </div>
+            <dl>
+              <div><dt>Escora de equilibrio</dt><dd>{format(stability.heelAngle, 1)}°</dd></div>
+              <div><dt>Ángulo de inundación</dt><dd>{format(stability.downfloodAngle, 1)}°</dd></div>
+              <div><dt>Rango positivo estimado</dt><dd>{format(stability.rangeOfStability, 1)}°</dd></div>
+            </dl>
+          </aside>
         </section>
 
-        <section className="chart-panel">
-          <h2>Curva de estabilidad GZ</h2>
-          <StabilityChart data={stability.curve} currentAngle={stability.heelAngle} />
-        </section>
+        <footer><Info size={15} /> Modelo educativo simplificado. No utilizar para decisiones operativas: consulte la información de estabilidad aprobada del buque.</footer>
       </main>
     </div>
   );
