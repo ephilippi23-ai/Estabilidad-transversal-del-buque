@@ -3,6 +3,7 @@ import { calculateStability, draftFromDisplacement, Inputs } from './stability';
 import { ShipScene } from './ShipScene';
 import { LongitudinalScene } from './LongitudinalScene';
 import { StabilityChart } from './StabilityChart';
+import { DynamicLesson } from './DynamicLesson';
 import { Slider } from './Slider';
 import { LoadPlan } from './LoadPlan';
 import { calculateLoadSummary, defaultLoadWeights, InverseSolution, InverseTarget, LoadWeights, solveInverseLoad } from './loadData';
@@ -132,9 +133,11 @@ function App() {
 
         <section className="chart-panel">
           <div className="chart-heading"><div><p className="eyebrow">Pantocarenas del Buque Echo</p><h2>Curva de brazos adrizantes</h2></div><div className="formula-pill">GZ = KN − KG<sub>corr</sub> · sen θ − GG′ · cos θ</div></div>
-          <StabilityChart data={stability.curve} currentAngle={stability.heelAngle} />
-          <div className="chart-stats"><span><b>{number(stability.maxGz)} m</b> GZ máximo a {number(stability.maxGzAngle, 1)}°</span><span><b>{number(stability.positiveRange, 1)}°</b> rango positivo</span><span><b>{number(stability.heelAngle, 1)}°</b> escora de equilibrio</span></div>
+          <StabilityChart result={stability} />
+          <div className="chart-stats"><span><b>{number(stability.maxGz)} m</b> GZ máximo a {number(stability.maxGzAngle, 1)}°</span><span><b>{number(stability.positiveRange, 1)}°</b> rango positivo</span><span><b>{number(stability.maxDynamic, 3)} m·rad</b> reserva dinámica máxima</span><span><b>{number(stability.heelAngle, 1)}°</b> escora de equilibrio</span></div>
         </section>
+
+        <DynamicLesson result={stability} />
 
         <section className="calculation-panel">
           <div><p className="eyebrow">Cuaderno de cálculo</p><h2>De los datos al resultado</h2><p>Cada tarjeta muestra la operación usada. Cambia un control y sigue la cadena de efectos.</p></div>

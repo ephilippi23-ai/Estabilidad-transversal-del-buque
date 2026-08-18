@@ -21,6 +21,10 @@ En los tanques de doble fondo, la altura del centro de gravedad del líquido se 
 
 El **modo inverso** permite arrastrar un G objetivo sobre las vistas transversal y longitudinal. Manteniendo el desplazamiento, propone cambios compensados de carga y lastre que aproximan KG, LCG y TCG, siempre dentro de las capacidades disponibles. La propuesta es una solución didáctica posible, no una condición única.
 
+## Estabilidad dinámica
+
+El gráfico permite alternar entre estabilidad estática (`GZ`) y dinámica (`ED = ∫ GZ·dθ`). La integración se realiza cada 0,5° mediante el método trapezoidal. En condiciones escoradas se muestran por separado la curva adrizante, el brazo escorante y el resultante, junto con los equilibrios estático y dinámico y una lectura guiada para el estudiante.
+
 ## Ejecutar el proyecto
 
 Requiere una versión reciente de Node.js:

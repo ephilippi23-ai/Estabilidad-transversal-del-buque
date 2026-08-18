@@ -1,10 +1,14 @@
 export type Inputs = { draft: number; kg: number; freeSurfaceMoment: number; shiftedWeight: number; shiftDistance: number; loadTransverseMoment: number };
 export type StabilityPoint = { angle: number; gz: number };
+export type DynamicPoint = { angle: number; energy: number };
 export type HydrostaticPoint = { draft: number; displacement: number; tpc: number; kb: number; km: number; lcf: number; lcb: number; mct1cm: number };
 export type StabilityResult = {
   hydro: HydrostaticPoint; correctedKg: number; freeSurfaceCorrection: number; gm: number;
   transverseG: number; heelingMoment: number; heelAngle: number; gzAtHeel: number;
   maxGz: number; maxGzAngle: number; positiveRange: number; curve: StabilityPoint[];
+  uprightCurve: StabilityPoint[]; heelingCurve: StabilityPoint[]; dynamicCurve: DynamicPoint[];
+  dynamicEquilibrium: number | null; maxDynamic: number; maxDynamicAngle: number;
+  minDynamic: number; staticEquilibrium: number; vanishingAngle: number;
   statusLabel: string; statusColor: 'good' | 'reduced' | 'danger'; interpretation: string;
 };
 
@@ -135,18 +139,39 @@ export function calculateStability(inputs: Inputs): StabilityResult {
   const heelingMoment = inputs.loadTransverseMoment || inputs.shiftedWeight * inputs.shiftDistance;
   const transverseG = heelingMoment / hydro.displacement;
   const transverseMagnitude = Math.abs(transverseG);
-  const curve = Array.from({ length: 181 }, (_, index) => {
+  const uprightCurve = Array.from({ length: 181 }, (_, index) => {
     const angle = index * 0.5; const radians = angle * Math.PI / 180;
-    const gz = interpolateKn(hydro.displacement, angle) - correctedKg * Math.sin(radians) - transverseMagnitude * Math.cos(radians);
+    const gz = interpolateKn(hydro.displacement, angle) - correctedKg * Math.sin(radians);
     return { angle, gz };
   });
+  const heelingCurve = uprightCurve.map(({ angle }) => ({ angle, gz: transverseMagnitude*Math.cos(angle*Math.PI/180) }));
+  const curve = uprightCurve.map((point,index) => ({ angle: point.angle, gz: point.gz-heelingCurve[index].gz }));
   const crossing = transverseG === 0 ? undefined : curve.find((point, index) => index > 0 && point.gz >= 0 && curve[index - 1].gz < 0);
-  const heelAngle = transverseG === 0 ? 0 : (crossing?.angle ?? 90) * Math.sign(transverseG);
+  const crossingIndex = crossing ? curve.indexOf(crossing) : -1;
+  const interpolateZero = (before: StabilityPoint, after: StabilityPoint) => before.angle + (-before.gz)*(after.angle-before.angle)/(after.gz-before.gz);
+  const staticEquilibrium = crossingIndex > 0 ? interpolateZero(curve[crossingIndex-1],curve[crossingIndex]) : 0;
+  const heelAngle = transverseG === 0 ? 0 : (crossing ? staticEquilibrium : 90) * Math.sign(transverseG);
   const gzAtHeel = curve.find((point) => point.angle >= Math.abs(heelAngle))?.gz ?? 0;
   const maxPoint = curve.reduce((best, point) => point.gz > best.gz ? point : best, curve[0]);
-  const positiveRange = [...curve].reverse().find((point) => point.gz > 0)?.angle ?? 0;
+  let vanishingAngle = 0;
+  for (let index=curve.indexOf(maxPoint)+1; index<curve.length; index+=1) {
+    if (curve[index].gz <= 0 && curve[index-1].gz > 0) { vanishingAngle=interpolateZero(curve[index-1],curve[index]); break; }
+  }
+  const positiveRange = vanishingAngle || ([...curve].reverse().find((point) => point.gz > 0)?.angle ?? 0);
+  const dynamicCurve: DynamicPoint[] = [{ angle:0, energy:0 }];
+  for (let index=1; index<curve.length; index+=1) {
+    const deltaRadians=(curve[index].angle-curve[index-1].angle)*Math.PI/180;
+    dynamicCurve.push({ angle:curve[index].angle, energy:dynamicCurve[index-1].energy+(curve[index-1].gz+curve[index].gz)*.5*deltaRadians });
+  }
+  const minDynamicPoint=dynamicCurve.reduce((best,point)=>point.energy<best.energy?point:best,dynamicCurve[0]);
+  const maxDynamicPoint=dynamicCurve.reduce((best,point)=>point.energy>best.energy?point:best,dynamicCurve[0]);
+  let dynamicEquilibrium: number|null=null;
+  const minIndex=dynamicCurve.indexOf(minDynamicPoint);
+  for(let index=minIndex+1;index<dynamicCurve.length;index+=1){if(dynamicCurve[index].energy>=0&&dynamicCurve[index-1].energy<0){const a=dynamicCurve[index-1],b=dynamicCurve[index];dynamicEquilibrium=a.angle+(-a.energy)*(b.angle-a.angle)/(b.energy-a.energy);break;}}
   const status = getStatus(gm, positiveRange);
   return { hydro, correctedKg, freeSurfaceCorrection, gm, transverseG, heelingMoment, heelAngle, gzAtHeel,
-    maxGz: maxPoint.gz, maxGzAngle: maxPoint.angle, positiveRange, curve,
+    maxGz: maxPoint.gz, maxGzAngle: maxPoint.angle, positiveRange, curve, uprightCurve, heelingCurve, dynamicCurve,
+    dynamicEquilibrium, maxDynamic:maxDynamicPoint.energy, maxDynamicAngle:maxDynamicPoint.angle,
+    minDynamic:minDynamicPoint.energy, staticEquilibrium, vanishingAngle,
     statusLabel: status.label, statusColor: status.color, interpretation: status.interpretation };
 }
