@@ -1,8 +1,8 @@
 import { Inputs, StabilityResult } from './stability';
 
-type Props = { data: StabilityResult; inputs: Inputs };
+type Props = { data: StabilityResult; inputs: Inputs; lcg?: number };
 
-export function LongitudinalScene({ data, inputs }: Props) {
+export function LongitudinalScene({ data, inputs, lcg }: Props) {
   const midshipX = 310;
   const metersToPixels = 18;
   const longitudinalX = (meters: number) => midshipX + meters * metersToPixels;
@@ -39,6 +39,10 @@ export function LongitudinalScene({ data, inputs }: Props) {
             <line x1={longitudinalX(data.hydro.lcf)} y1="150" x2={longitudinalX(data.hydro.lcf)} y2="258"/>
             <circle cx={longitudinalX(data.hydro.lcf)} cy={waterY} r="11"/><text x={longitudinalX(data.hydro.lcf)+14} y="154">F · Xf {data.hydro.lcf.toFixed(2)} m</text>
           </g>
+          {lcg !== undefined && <g className="longitudinal-marker marker-g-long">
+            <line x1={longitudinalX(lcg)} y1="165" x2={longitudinalX(lcg)} y2="248"/>
+            <circle cx={longitudinalX(lcg)} cy="198" r="11"/><text x={longitudinalX(lcg)+14} y="190">G · Xg {lcg.toFixed(2)} m</text>
+          </g>}
 
           <line x1="76" y1="344" x2="548" y2="344" stroke="#6f959b"/>
           <line x1="76" y1="337" x2="76" y2="351" stroke="#6f959b"/><line x1="548" y1="337" x2="548" y2="351" stroke="#6f959b"/>
@@ -51,6 +55,7 @@ export function LongitudinalScene({ data, inputs }: Props) {
         <article><i className="dot-b"/><div><b>Centro de carena longitudinal (B)</b><p>Punto de aplicación del empuje. Su posición es Xb = {data.hydro.lcb.toFixed(2)} m.</p></div></article>
         <article><i className="dot-f"/><div><b>Centro de flotación (F)</b><p>El buque cambia su asiento alrededor de F. Xf = {data.hydro.lcf.toFixed(2)} m.</p></div></article>
         <article><i className="dot-mct"/><div><b>Momento para cambiar 1 cm</b><p>MCT 1 cm = {data.hydro.mct1cm.toFixed(1)} t·m/cm.</p></div></article>
+        {lcg !== undefined && <article><i className="dot-g-long"/><div><b>Centro de gravedad longitudinal</b><p>Xg = {lcg.toFixed(2)} m, calculado desde el cuadro de carga.</p></div></article>}
       </div>
     </div>
   );

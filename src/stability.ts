@@ -1,4 +1,4 @@
-export type Inputs = { draft: number; kg: number; freeSurfaceMoment: number; shiftedWeight: number; shiftDistance: number };
+export type Inputs = { draft: number; kg: number; freeSurfaceMoment: number; shiftedWeight: number; shiftDistance: number; loadTransverseMoment: number };
 export type StabilityPoint = { angle: number; gz: number };
 export type HydrostaticPoint = { draft: number; displacement: number; tpc: number; kb: number; km: number; lcf: number; lcb: number; mct1cm: number };
 export type StabilityResult = {
@@ -105,6 +105,11 @@ export function interpolateHydrostatics(draft: number): HydrostaticPoint {
     mct1cm: lerp(la.mct1cm,lb.mct1cm,longitudinalRatio) };
 }
 
+export function draftFromDisplacement(displacement: number): number {
+  const [a, b, ratio] = bracket(hydroRows, displacement, (row) => row.displacement);
+  return lerp(a.draft, b.draft, ratio);
+}
+
 export function interpolateKn(displacement: number, angle: number): number {
   const [a, b, dr] = bracket(knRows, clamp(displacement, 2800, 8400), (row) => row.displacement);
   const boundedAngle = clamp(Math.abs(angle), 0, 90);
@@ -127,16 +132,17 @@ export function calculateStability(inputs: Inputs): StabilityResult {
   const freeSurfaceCorrection = inputs.freeSurfaceMoment / hydro.displacement;
   const correctedKg = inputs.kg + freeSurfaceCorrection;
   const gm = hydro.km - correctedKg;
-  const heelingMoment = inputs.shiftedWeight * inputs.shiftDistance;
+  const heelingMoment = inputs.loadTransverseMoment || inputs.shiftedWeight * inputs.shiftDistance;
   const transverseG = heelingMoment / hydro.displacement;
+  const transverseMagnitude = Math.abs(transverseG);
   const curve = Array.from({ length: 181 }, (_, index) => {
     const angle = index * 0.5; const radians = angle * Math.PI / 180;
-    const gz = interpolateKn(hydro.displacement, angle) - correctedKg * Math.sin(radians) - transverseG * Math.cos(radians);
+    const gz = interpolateKn(hydro.displacement, angle) - correctedKg * Math.sin(radians) - transverseMagnitude * Math.cos(radians);
     return { angle, gz };
   });
   const crossing = transverseG === 0 ? undefined : curve.find((point, index) => index > 0 && point.gz >= 0 && curve[index - 1].gz < 0);
-  const heelAngle = transverseG === 0 ? 0 : crossing?.angle ?? 90;
-  const gzAtHeel = curve.find((point) => point.angle >= heelAngle)?.gz ?? 0;
+  const heelAngle = transverseG === 0 ? 0 : (crossing?.angle ?? 90) * Math.sign(transverseG);
+  const gzAtHeel = curve.find((point) => point.angle >= Math.abs(heelAngle))?.gz ?? 0;
   const maxPoint = curve.reduce((best, point) => point.gz > best.gz ? point : best, curve[0]);
   const positiveRange = [...curve].reverse().find((point) => point.gz > 0)?.angle ?? 0;
   const status = getStatus(gm, positiveRange);

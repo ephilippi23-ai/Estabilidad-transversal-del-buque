@@ -7,7 +7,7 @@ export function ShipScene({ data, inputs }: Props) {
   const centerX = 300; const keelY = 275; const pxPerMeter = 22;
   const pointY = (height: number) => clamp(keelY - height * pxPerMeter, 34, keelY);
   const waterY = pointY(inputs.draft);
-  const heel = clamp(data.heelAngle, 0, 28);
+  const heel = clamp(data.heelAngle, -28, 28);
   const cargoX = centerX + (inputs.shiftDistance / 8) * 118;
   const tankLevel = clamp(inputs.freeSurfaceMoment / 4000, 0, 1);
 

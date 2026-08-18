@@ -11,7 +11,7 @@ export function StabilityChart({ data, currentAngle }: Props) {
   const zeroY = y(0);
   const points = data.map((point) => `${x(point.angle)},${y(point.gz)}`).join(' ');
   const positiveArea = data.map((point) => `${x(point.angle)},${y(Math.max(0, point.gz))}`).join(' ');
-  const current = data.find((point) => point.angle >= currentAngle) ?? data[0];
+  const current = data.find((point) => point.angle >= Math.abs(currentAngle)) ?? data[0];
   const yTicks = Array.from({ length: 5 }, (_, index) => minGz + (maxGz-minGz)*index/4);
 
   return (

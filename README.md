@@ -11,8 +11,11 @@ Simulador educativo interactivo para estudiar la estabilidad transversal con los
 - Traslado transversal de pesos, momento escorante y corrimiento de G.
 - Curva de brazos adrizantes a partir de pantocarenas: `GZ = KN − KG·sen θ`.
 - Casos comparativos y cuaderno de cálculo visible paso a paso.
+- Cuadro de carga basado en `Tabla CG - BUQUE ECHO.xls`, con cálculo automático de desplazamiento, KG, LCG, TCG y superficies libres.
 
 Los valores intermedios se calculan mediante interpolación lineal. El rango del simulador se limita a la zona común de las tablas hidrostática y KN suministradas.
+
+El modo **Cuadro de carga** permite ajustar pesos y porcentajes de llenado por categoría. La corrección de superficie libre para tanques parciales es una aproximación educativa: nula vacío/lleno y máxima al 50%.
 
 ## Ejecutar el proyecto
 

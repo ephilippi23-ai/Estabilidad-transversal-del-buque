@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { calculateStability, Inputs } from './stability';
+import { calculateStability, draftFromDisplacement, Inputs } from './stability';
 import { ShipScene } from './ShipScene';
 import { LongitudinalScene } from './LongitudinalScene';
 import { StabilityChart } from './StabilityChart';
 import { Slider } from './Slider';
+import { LoadPlan } from './LoadPlan';
+import { calculateLoadSummary, defaultLoadWeights, LoadWeights } from './loadData';
 
-const initialState: Inputs = { draft: 5.8, kg: 5.39, freeSurfaceMoment: 0, shiftedWeight: 0, shiftDistance: 0 };
+const initialState: Inputs = { draft: 5.8, kg: 5.39, freeSurfaceMoment: 0, shiftedWeight: 0, shiftDistance: 0, loadTransverseMoment: 0 };
 
 const lessons = [
   { title: '1. Flotación', tag: 'Δ y calado', text: 'Al aumentar el calado crece el volumen de carena y, por Arquímedes, el desplazamiento. La tabla hidrostática vincula ambos valores.' },
@@ -28,8 +30,17 @@ function App() {
   const [inputs, setInputs] = useState(initialState);
   const [lesson, setLesson] = useState(0);
   const [view, setView] = useState<'transverse' | 'longitudinal'>('transverse');
-  const stability = useMemo(() => calculateStability(inputs), [inputs]);
+  const [mode, setMode] = useState<'explore' | 'load'>('explore');
+  const [loadWeights, setLoadWeights] = useState<LoadWeights>(defaultLoadWeights);
+  const loadSummary = useMemo(() => calculateLoadSummary(loadWeights), [loadWeights]);
+  const effectiveInputs = useMemo<Inputs>(() => mode === 'explore' ? inputs : ({
+    draft: draftFromDisplacement(loadSummary.displacement), kg: loadSummary.kg,
+    freeSurfaceMoment: loadSummary.freeSurfaceMoment, shiftedWeight: 0, shiftDistance: 0,
+    loadTransverseMoment: loadSummary.tcg * loadSummary.displacement,
+  }), [mode, inputs, loadSummary]);
+  const stability = useMemo(() => calculateStability(effectiveInputs), [effectiveInputs]);
   const set = (field: keyof Inputs) => (value: number) => setInputs((current) => ({ ...current, [field]: value }));
+  const updateLoad = (id: string, value: number) => setLoadWeights((current) => ({ ...current, [id]: Number.isFinite(value) ? value : 0 }));
 
   return (
     <div className="page-shell">
@@ -42,6 +53,11 @@ function App() {
         </div>
         <div className={`status-badge status-${stability.statusColor}`}><span className="status-dot" />{stability.statusLabel}</div>
       </header>
+
+      <div className="mode-switcher" role="group" aria-label="Modo del simulador">
+        <button className={mode === 'explore' ? 'active' : ''} onClick={() => setMode('explore')}><b>Explorador rápido</b><span>Controla las variables directamente</span></button>
+        <button className={mode === 'load' ? 'active' : ''} onClick={() => setMode('load')}><b>Cuadro de carga</b><span>Calcula Δ y G desde pesos reales</span><em>Nuevo</em></button>
+      </div>
 
       <nav className="lesson-strip" aria-label="Recorrido de aprendizaje">
         {lessons.map((item, index) => <button key={item.title} className={lesson === index ? 'active' : ''} onClick={() => setLesson(index)}><span>{item.title}</span><small>{item.tag}</small></button>)}
@@ -59,7 +75,7 @@ function App() {
             <button className={view === 'transverse' ? 'active' : ''} onClick={() => setView('transverse')}><span>↔</span><div><b>Vista transversal</b><small>Escora, G, B, M y GM</small></div></button>
             <button className={view === 'longitudinal' ? 'active' : ''} onClick={() => setView('longitudinal')}><span>⇄</span><div><b>Vista longitudinal</b><small>Flotación, asiento, Xb y Xf</small></div></button>
           </div>
-          {view === 'transverse' ? <ShipScene data={stability} inputs={inputs} /> : <LongitudinalScene data={stability} inputs={inputs} />}
+          {view === 'transverse' ? <ShipScene data={stability} inputs={effectiveInputs} /> : <LongitudinalScene data={stability} inputs={effectiveInputs} lcg={mode === 'load' ? loadSummary.lcg : undefined} />}
           <div className="metric-grid">
             <article><span>Desplazamiento Δ</span><strong>{number(stability.hydro.displacement, 0)} t</strong><small>Interpolado de la tabla</small></article>
             <article><span>KB</span><strong>{number(stability.hydro.kb)} m</strong><small>Quilla → centro de carena</small></article>
@@ -71,17 +87,18 @@ function App() {
             <div><span>Lectura rápida</span><strong>{stability.gm > 1 ? 'G está claramente por debajo de M: hay una reserva inicial amplia.' : stability.gm > 0 ? 'G aún está debajo de M, pero el margen se está reduciendo.' : 'G superó a M: prueba bajar KG o eliminar superficie libre.'}</strong></div>
             <div className="gm-scale"><span>GM</span><div><i style={{ width: `${Math.max(0, Math.min(100, stability.gm / 2 * 100))}%` }} /></div><b>{number(stability.gm)} m</b></div>
           </div>
-          <div className="missions-panel">
+          {mode === 'explore' && <div className="missions-panel">
             <div className="missions-heading"><div><p className="eyebrow">Aprende haciendo</p><h3>Misiones rápidas</h3></div><span>{[inputs.freeSurfaceMoment >= 3000, inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6, stability.gm <= 0].filter(Boolean).length}/3</span></div>
             <div className="missions-grid">
               <button className={inputs.freeSurfaceMoment >= 3000 ? 'done' : ''} onClick={() => setInputs({ ...initialState, freeSurfaceMoment: 4000 })}><i>{inputs.freeSurfaceMoment >= 3000 ? '✓' : '1'}</i><span><b>Haz visible la superficie libre</b><small>¿Cuánto GM se pierde?</small></span></button>
               <button className={inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6 ? 'done' : ''} onClick={() => setInputs({ ...initialState, shiftedWeight: 400, shiftDistance: 8 })}><i>{inputs.shiftedWeight >= 300 && inputs.shiftDistance >= 6 ? '✓' : '2'}</i><span><b>Provoca una escora</b><small>Sigue el desplazamiento de G.</small></span></button>
               <button className={stability.gm <= 0 ? 'done danger-done' : ''} onClick={() => setInputs({ ...initialState, kg: 7.3 })}><i>{stability.gm <= 0 ? '✓' : '3'}</i><span><b>Encuentra el límite</b><small>Eleva KG hasta superar M.</small></span></button>
             </div>
-          </div>
+          </div>}
         </section>
 
         <aside className="controls-panel">
+          {mode === 'explore' ? <>
           <div className="panel-section">
             <div className="section-heading"><div><p className="eyebrow">Experimenta</p><h2>Condición de carga</h2></div><button className="reset-button" onClick={() => setInputs(initialState)}>Restablecer</button></div>
             <Slider label="Calado medio" value={inputs.draft} min={2.3} max={5.9} step={0.1} unit="m" help="Rango común cubierto por las tablas hidrostática y KN." onChange={set('draft')} />
@@ -94,7 +111,18 @@ function App() {
           <div className="preset-panel"><p className="eyebrow">Casos para comparar</p><div className="preset-grid">{presets.map((preset) => <button key={preset.label} onClick={() => setInputs(preset.values)}>{preset.label}</button>)}</div></div>
 
           <div className={`interpretation status-${stability.statusColor}`}><strong>{stability.statusLabel}</strong><p>{stability.interpretation}</p></div>
+          </> : <>
+            <div className="load-side-card">
+              <p className="eyebrow">Resultado del cuadro</p><h2>G calculado por momentos</h2>
+              <div className="load-g"><span>KG</span><strong>{number(loadSummary.kg,3)} m</strong><small>corregido: {number(loadSummary.correctedKg,3)} m</small></div>
+              <div className="load-position"><span><b>LCG</b>{number(loadSummary.lcg,2)} m</span><span><b>TCG</b>{number(loadSummary.tcg,3)} m</span></div>
+              <p>Modifica el cuadro de carga que aparece debajo. El calado y toda la estabilidad responderán automáticamente.</p>
+            </div>
+            <div className={`interpretation status-${stability.statusColor}`}><strong>{stability.statusLabel}</strong><p>{stability.interpretation}</p></div>
+          </>}
         </aside>
+
+        {mode === 'load' && <LoadPlan weights={loadWeights} summary={loadSummary} onChange={updateLoad} onReset={() => setLoadWeights(defaultLoadWeights)} />}
 
         <section className="chart-panel">
           <div className="chart-heading"><div><p className="eyebrow">Pantocarenas del Buque Echo</p><h2>Curva de brazos adrizantes</h2></div><div className="formula-pill">GZ = KN − KG<sub>corr</sub> · sen θ − GG′ · cos θ</div></div>
@@ -105,10 +133,10 @@ function App() {
         <section className="calculation-panel">
           <div><p className="eyebrow">Cuaderno de cálculo</p><h2>De los datos al resultado</h2><p>Cada tarjeta muestra la operación usada. Cambia un control y sigue la cadena de efectos.</p></div>
           <div className="calculation-grid">
-            <article><span>01 · Tabla hidrostática</span><code>T = {number(inputs.draft, 1)} m → Δ = {number(stability.hydro.displacement, 0)} t</code><p>También obtenemos KM = {number(stability.hydro.km)} m y TPC = {number(stability.hydro.tpc)} t/cm.</p></article>
-            <article><span>02 · Superficie libre</span><code>FSC = {number(inputs.freeSurfaceMoment, 0)} / {number(stability.hydro.displacement, 0)} = {number(stability.freeSurfaceCorrection, 3)} m</code><p>KG corregido = {number(inputs.kg)} + {number(stability.freeSurfaceCorrection, 3)} = {number(stability.correctedKg, 3)} m.</p></article>
+            <article><span>01 · Tabla hidrostática</span><code>{mode === 'load' ? `Δ = ${number(loadSummary.displacement,0)} t → T = ${number(effectiveInputs.draft,2)} m` : `T = ${number(effectiveInputs.draft,1)} m → Δ = ${number(stability.hydro.displacement,0)} t`}</code><p>También obtenemos KM = {number(stability.hydro.km)} m y TPC = {number(stability.hydro.tpc)} t/cm.</p></article>
+            <article><span>02 · Superficie libre</span><code>FSC = {number(effectiveInputs.freeSurfaceMoment, 0)} / {number(stability.hydro.displacement, 0)} = {number(stability.freeSurfaceCorrection, 3)} m</code><p>KG corregido = {number(effectiveInputs.kg)} + {number(stability.freeSurfaceCorrection, 3)} = {number(stability.correctedKg, 3)} m.</p></article>
             <article><span>03 · Altura metacéntrica</span><code>GM = {number(stability.hydro.km)} − {number(stability.correctedKg, 3)} = {number(stability.gm, 3)} m</code><p>El signo de GM describe la estabilidad para inclinaciones pequeñas.</p></article>
-            <article><span>04 · Traslado transversal</span><code>GG′ = ({number(inputs.shiftedWeight, 0)} × {number(inputs.shiftDistance, 1)}) / {number(stability.hydro.displacement, 0)} = {number(stability.transverseG, 3)} m</code><p>Momento escorante: {number(stability.heelingMoment, 0)} t·m.</p></article>
+            <article><span>04 · Momento transversal</span><code>{mode === 'load' ? `TCG = Σ(w·y) / Δ = ${number(loadSummary.tcg,3)} m` : `GG′ = (${number(inputs.shiftedWeight,0)} × ${number(inputs.shiftDistance,1)}) / ${number(stability.hydro.displacement,0)} = ${number(stability.transverseG,3)} m`}</code><p>Momento escorante: {number(stability.heelingMoment, 0)} t·m.</p></article>
           </div>
         </section>
 
