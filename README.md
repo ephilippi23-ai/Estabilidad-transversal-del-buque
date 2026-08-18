@@ -17,6 +17,8 @@ Los valores intermedios se calculan mediante interpolación lineal. El rango del
 
 El modo **Cuadro de carga** permite ajustar pesos y porcentajes de llenado por categoría. La corrección de superficie libre para tanques parciales es una aproximación educativa: nula vacío/lleno y máxima al 50%.
 
+En los tanques de doble fondo, la altura del centro de gravedad del líquido se considera proporcional al porcentaje de llenado. Para los piques de proa y popa se adopta `KG ≈ 0,65 × altura del nivel`. Estas reglas didácticas se muestran junto a los valores calculados.
+
 ## Ejecutar el proyecto
 
 Requiere una versión reciente de Node.js:

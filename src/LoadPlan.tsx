@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LoadCategory, LoadSummary, LoadWeights, loadItems } from './loadData';
+import { effectiveTankVcg, LoadCategory, LoadSummary, LoadWeights, loadItems } from './loadData';
 
 type Props = { weights: LoadWeights; summary: LoadSummary; onChange: (id: string, value: number) => void; onReset: () => void };
 const categories: Array<LoadCategory | 'Todos'> = ['Todos','Combustible','Agua y consumos','Carga','Lastre'];
@@ -29,18 +29,19 @@ export function LoadPlan({ weights, summary, onChange, onReset }: Props) {
         <div className="load-legend"><span><i className="liquid-symbol"/> Líquido</span><span>Posiciones: + popa / estribor</span></div>
       </div>
       <div className="load-table" role="table" aria-label="Pesos del cuadro de carga">
-        <div className="load-table-head" role="row"><span>Espacio</span><span>Peso</span><span>Llenado</span><span>KG</span><span>Long.</span><span>Transv.</span></div>
+        <div className="load-table-head" role="row"><span>Espacio</span><span>Peso</span><span>Llenado</span><span>KG actual</span><span>Long.</span><span>Transv.</span></div>
         {visible.map((item) => {
           const weight = weights[item.id] ?? 0; const fill = item.maxWeight ? weight/item.maxWeight*100 : 0;
+          const effectiveVcg = effectiveTankVcg(item, weight);
           return <div className="load-row" role="row" key={item.id}>
             <div className="load-name"><b>{item.name}</b><small>{item.category}{item.liquid ? ' · tanque' : ''}</small></div>
             <label><input type="number" min="0" max={item.maxWeight} step="1" value={Math.round(weight*10)/10} onChange={(event) => onChange(item.id, Number(event.target.value))}/><span>t</span></label>
             <div className="fill-control"><input aria-label={`Llenado de ${item.name}`} type="range" min="0" max={item.maxWeight} step="1" value={weight} onChange={(event) => onChange(item.id, Number(event.target.value))}/><small>{format(fill,0)}%</small></div>
-            <code>{format(item.vcg,2)} m</code><code>{format(item.lcg,1)} m</code><code>{format(item.tcg,1)} m</code>
+            <code className={item.vcgModel ? 'calculated-vcg' : ''} title={item.vcgModel === 'end-tank-065' ? '65% de la altura estimada del nivel' : item.vcgModel ? 'KG lleno × porcentaje de llenado' : 'KG fijo del cuadro'}>{format(effectiveVcg,2)} m{item.vcgModel && <small> de {format(item.vcg,2)}</small>}</code><code>{format(item.lcg,1)} m</code><code>{format(item.tcg,1)} m</code>
           </div>;
         })}
       </div>
-      <div className="load-footnote"><b>Superficie libre automática:</b> para fines didácticos, la corrección crece desde cero, alcanza el máximo al 50% y vuelve a cero con el tanque lleno. Los datos base proceden de la columna GG′ del cuadro original.</div>
+      <div className="load-footnote"><p><b>KG variable:</b> en doblefondos, KG = KG lleno × llenado; en piques extremos, KG ≈ 0,65 × altura del nivel. Los demás espacios conservan el KG del cuadro.</p><p><b>Superficie libre:</b> se calcula aparte; crece desde cero, alcanza el máximo al 50% y vuelve a cero con el tanque lleno.</p></div>
     </section>
   );
 }
