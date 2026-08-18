@@ -1,39 +1,32 @@
-# Simulador de Estabilidad Transversal de Buques
+# TrimLab - estabilidad transversal
 
-Este proyecto es una aplicación web interactiva que visualiza la estabilidad transversal de un barco en sección.
+Simulador educativo interactivo para explorar la estabilidad transversal de un buque. La interfaz muestra en tiempo real la escora, los centros G/B/M, las fuerzas, GM, GZ, momento adrizante, efecto de superficie libre y curva de brazos adrizantes.
 
-## Cómo iniciar
+## Iniciar en esta Mac
 
-1. Abre la terminal y sitúate en el directorio del proyecto:
-   ```bash
-   cd /Users/ephil/Documents/CHATGPT
-   ```
-2. Instala dependencias (solo la primera vez):
-   ```bash
-   npm install
-   ```
-3. Ejecuta el servidor de desarrollo:
-   ```bash
-   npm run dev
-   ```
+La forma mas simple es hacer doble clic en `start.command`. Se abrira automaticamente:
 
-## Qué contiene
+`http://localhost:5173`
 
-- Vista de sección transversal animada del buque
-- Línea de flotación y representación de fuerzas
-- Indicadores de G, B, M, GM, GZ
-- Tanque de lastre y carga móvil
-- Curva dinámica de estabilidad `GZ`
-- Controles de parámetros del buque y del centro de gravedad
-- Mensajes de estado de estabilidad
+Desde Terminal, el equivalente es:
 
-## Notas
+```bash
+cd /Users/ephil/Documents/CHATGPT
+./start.command
+```
 
-- El proyecto usa Vite + React + TypeScript.
-- Si no tienes Node instalado, puedes instalarlo con `nvm`:
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  nvm install --lts
-  ```
+Para detener el servidor, pulse `Control + C` en la ventana de Terminal.
+
+## Desarrollo
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+El proyecto usa React, TypeScript y Vite. En esta maquina tambien se incluye un runtime local ignorado por Git en `.tools/node`, por lo que `start.command` funciona aunque Node.js no este instalado globalmente.
+
+## Alcance del modelo
+
+El calculo combina momentos de pesos, volumen desplazado en agua de mar, inercia transversal de la flotacion y correccion por superficie libre. La curva GZ a grandes angulos es una aproximacion didactica. No sustituye las curvas KN, condiciones de carga ni el cuaderno de estabilidad aprobado del buque.
